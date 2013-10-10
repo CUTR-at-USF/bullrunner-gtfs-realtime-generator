@@ -16,6 +16,7 @@
 package org.onebusaway.gtfs_realtime.trip_updates_producer_demo;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URL;
 import java.util.HashSet;
 import java.util.Set;
@@ -26,6 +27,7 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.Parser;
+import org.json.JSONException;
 import org.onebusaway.cli.CommandLineInterfaceLibrary;
 import org.onebusaway.guice.jsr250.LifecycleService;
 import org.onebusway.gtfs_realtime.exporter.TripUpdatesFileWriter;
@@ -39,88 +41,107 @@ import com.google.inject.Module;
 
 public class GtfsRealtimeTripUpdatesProducerDemoMain {
 
-  private static final String ARG_TRIP_UPDATES_PATH = "tripUpdatesPath";
+	private static final String ARG_TRIP_UPDATES_PATH = "tripUpdatesPath";
 
-  private static final String ARG_TRIP_UPDATES_URL = "tripUpdatesUrl";
+	private static final String ARG_TRIP_UPDATES_URL = "tripUpdatesUrl";
 
-  private static final String ARG_VEHICLE_POSITIONS_PATH = "vehiclePositionsPath";
+	private static final String ARG_VEHICLE_POSITIONS_PATH = "vehiclePositionsPath";
 
-  private static final String ARG_VEHICLE_POSITIONS_URL = "vehiclePositionsUrl";
+	private static final String ARG_VEHICLE_POSITIONS_URL = "vehiclePositionsUrl";
 
-  public static void main(String[] args) throws Exception {
-    GtfsRealtimeTripUpdatesProducerDemoMain m = new GtfsRealtimeTripUpdatesProducerDemoMain();
-    m.run(args);
-  }
+	public static void main(String[] args) throws Exception {
+		GtfsRealtimeTripUpdatesProducerDemoMain m = new GtfsRealtimeTripUpdatesProducerDemoMain();
+		m.run(args);
+	}
 
-  private GtfsRealtimeProviderImpl _provider;
+	private GtfsRealtimeProviderImpl _provider;
+//	private BullRunnerConfigExtract _providerConfig;
+	private LifecycleService _lifecycleService;
+//	@Inject
+//	public void setProvider(BullRunnerConfigExtract providerConfig) {
+//		_providerConfig = providerConfig;
+//	}
 
-  private LifecycleService _lifecycleService;
+	@Inject
+	public void setProvider(GtfsRealtimeProviderImpl provider) {
+		_provider = provider;
+	}
 
-  @Inject
-  public void setProvider(GtfsRealtimeProviderImpl provider) {
-    _provider = provider;
-  }
 
-  @Inject
-  public void setLifecycleService(LifecycleService lifecycleService) {
-    _lifecycleService = lifecycleService;
-  }
+	@Inject
+	public void setLifecycleService(LifecycleService lifecycleService) {
+		_lifecycleService = lifecycleService;
+	}
 
-  public void run(String[] args) throws Exception {
+	public void run(String[] args) throws Exception {
 
-    if (args.length == 0 || CommandLineInterfaceLibrary.wantsHelp(args)) {
-      printUsage();
-      System.exit(-1);
-    }
+		if (args.length == 0 || CommandLineInterfaceLibrary.wantsHelp(args)) {
+			printUsage();
+			System.exit(-1);
+		}
 
-    Options options = new Options();
-    buildOptions(options);
-    Parser parser = new GnuParser();
-    CommandLine cli = parser.parse(options, args);
+		Options options = new Options();
+		buildOptions(options);
+		Parser parser = new GnuParser();
+		CommandLine cli = parser.parse(options, args);
 
-    Set<Module> modules = new HashSet<Module>();
-    GtfsRealtimeTripUpdatesProducerDemoModule.addModuleAndDependencies(modules);
+		Set<Module> modules = new HashSet<Module>();
+		GtfsRealtimeTripUpdatesProducerDemoModule
+				.addModuleAndDependencies(modules);
 
-    Injector injector = Guice.createInjector(modules);
-    injector.injectMembers(this);
+		Injector injector = Guice.createInjector(modules);
+		injector.injectMembers(this);
 
-    _provider.setUrl(new URL("http://www3.septa.org/hackathon/TrainView/"));
+		// _provider.setUrl(new
+		// URL("http://www3.septa.org/hackathon/TrainView/"));
+//		_providerConfig.setUrl(new URL("http://api.syncromatics.com/feed/511/Configuration/?api_key=593e3f10de49d7fec7c8ace98f0ee6d1&format=json"));
+//		_providerConfig.generatesRouteAndStopsMap();
+	
+		_provider.setUrl(new URL(
+						"http://api.syncromatics.com/feed/511/Prediction/?api_key=593e3f10de49d7fec7c8ace98f0ee6d1&format=json"));
+		
+		if (cli.hasOption(ARG_TRIP_UPDATES_URL)) {
+			URL url = new URL(cli.getOptionValue(ARG_TRIP_UPDATES_URL));
+			TripUpdatesServlet servlet = injector
+					.getInstance(TripUpdatesServlet.class);
+			servlet.setUrl(url);
+		}
+		if (cli.hasOption(ARG_TRIP_UPDATES_PATH)) {
+			File path = new File(cli.getOptionValue(ARG_TRIP_UPDATES_PATH));
 
-    if (cli.hasOption(ARG_TRIP_UPDATES_URL)) {
-      URL url = new URL(cli.getOptionValue(ARG_TRIP_UPDATES_URL));
-      TripUpdatesServlet servlet = injector.getInstance(TripUpdatesServlet.class);
-      servlet.setUrl(url);
-    }
-    if (cli.hasOption(ARG_TRIP_UPDATES_PATH)) {
-      File path = new File(cli.getOptionValue(ARG_TRIP_UPDATES_PATH));
-      TripUpdatesFileWriter writer = injector.getInstance(TripUpdatesFileWriter.class);
-      writer.setPath(path);
-    }
+			TripUpdatesFileWriter writer = injector
+					.getInstance(TripUpdatesFileWriter.class);
+			writer.setPath(path);
+		}
 
-    if (cli.hasOption(ARG_VEHICLE_POSITIONS_URL)) {
-      URL url = new URL(cli.getOptionValue(ARG_VEHICLE_POSITIONS_URL));
-      VehiclePositionsServlet servlet = injector.getInstance(VehiclePositionsServlet.class);
-      servlet.setUrl(url);
-    }
-    if (cli.hasOption(ARG_VEHICLE_POSITIONS_PATH)) {
-      File path = new File(cli.getOptionValue(ARG_VEHICLE_POSITIONS_PATH));
-      VehiclePositionsFileWriter writer = injector.getInstance(VehiclePositionsFileWriter.class);
-      writer.setPath(path);
-    }
+		if (cli.hasOption(ARG_VEHICLE_POSITIONS_URL)) {
+			URL url = new URL(cli.getOptionValue(ARG_VEHICLE_POSITIONS_URL));
 
-    _lifecycleService.start();
-  }
+			VehiclePositionsServlet servlet = injector
+					.getInstance(VehiclePositionsServlet.class);
+			servlet.setUrl(url);
+		}
+		if (cli.hasOption(ARG_VEHICLE_POSITIONS_PATH)) {
+			File path = new File(cli.getOptionValue(ARG_VEHICLE_POSITIONS_PATH));
+			VehiclePositionsFileWriter writer = injector
+					.getInstance(VehiclePositionsFileWriter.class);
+			writer.setPath(path);
+		}
 
-  private void printUsage() {
-    CommandLineInterfaceLibrary.printUsage(getClass());
-  }
+		_lifecycleService.start();
+	}
 
-  protected void buildOptions(Options options) {
-    options.addOption(ARG_TRIP_UPDATES_PATH, true, "trip updates path");
-    options.addOption(ARG_TRIP_UPDATES_URL, true, "trip updates url");
-    options.addOption(ARG_VEHICLE_POSITIONS_PATH, true,
-        "vehicle positions path");
-    options.addOption(ARG_VEHICLE_POSITIONS_URL, true, "vehicle positions url");
+	private void printUsage() {
+		CommandLineInterfaceLibrary.printUsage(getClass());
+	}
 
-  }
+	protected void buildOptions(Options options) {
+		options.addOption(ARG_TRIP_UPDATES_PATH, true, "trip updates path");
+		options.addOption(ARG_TRIP_UPDATES_URL, true, "trip updates url");
+		options.addOption(ARG_VEHICLE_POSITIONS_PATH, true,
+				"vehicle positions path");
+		options.addOption(ARG_VEHICLE_POSITIONS_URL, true,
+				"vehicle positions url");
+
+	}
 }
