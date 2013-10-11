@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.onebusaway.gtfs_realtime.trip_updates_producer_demo;
+package edu.usf.cutr.gtfs_realtime.bullrunner;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -87,7 +87,7 @@ public class GtfsRealtimeProviderImpl {
 	/**
 	 * How often vehicle data will be downloaded, in seconds.
 	 */
-	private int _refreshInterval = 120;
+	private int _refreshInterval = 30;
 	private BullRunnerConfigExtract _providerConfig;
 
 	@Inject
@@ -176,7 +176,7 @@ public class GtfsRealtimeProviderImpl {
 		/**
 		 * We iterate over every JSON vehicle object.
 		 */
-		for (int i = 0; i < vehicleArray.length(); i += 2) {
+		for (int i = 0; i < vehicleArray.length(); i ++) {
 
 			JSONObject obj = vehicleArray.getJSONObject(i);
 

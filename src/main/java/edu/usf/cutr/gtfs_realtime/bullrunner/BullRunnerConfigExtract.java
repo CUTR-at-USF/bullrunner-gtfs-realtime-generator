@@ -1,4 +1,4 @@
-package org.onebusaway.gtfs_realtime.trip_updates_producer_demo;
+package edu.usf.cutr.gtfs_realtime.bullrunner;
 
 import java.io.BufferedReader;
 import java.io.IOException;
