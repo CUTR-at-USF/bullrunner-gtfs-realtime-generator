@@ -285,7 +285,7 @@ public class GtfsRealtimeProviderImpl {
 
 				JSONObject child = vehicleLocsArray.getJSONObject(l);
 				double lat = child.getDouble("vehicleLat");
-				double lon = child.getDouble("vehicleLat");
+				double lon = child.getDouble("vehicleLong");
 				/**
 				 * To construct our VehiclePosition, we create a position for
 				 * the vehicle. We add the position to a VehiclePosition
