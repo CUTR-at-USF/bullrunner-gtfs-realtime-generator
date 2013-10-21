@@ -56,10 +56,13 @@ import com.google.transit.realtime.GtfsRealtime.TripUpdate.StopTimeEvent;
 import com.google.transit.realtime.GtfsRealtime.TripUpdate.StopTimeUpdate;
 import com.google.transit.realtime.GtfsRealtime.VehicleDescriptor;
 import com.google.transit.realtime.GtfsRealtime.VehiclePosition;
+
 import java.net.URL;
+
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Module;
+
 /**
  * This class produces GTFS-realtime trip updates and vehicle positions by
  * periodically polling the custom SEPTA vehicle data API and converting the
@@ -78,7 +81,7 @@ public class GtfsRealtimeProviderImpl {
 
 	private static final Logger _log = LoggerFactory
 			.getLogger(GtfsRealtimeProviderImpl.class);
-
+	private String responseTimeStamp;
 	private ScheduledExecutorService _executor;
 
 	private GtfsRealtimeMutableProvider _gtfsRealtimeProvider;
@@ -124,12 +127,14 @@ public class GtfsRealtimeProviderImpl {
 	}
 
 	@PostConstruct
-	public void start()  {
+	public void start() {
 
-		try{
-		_providerConfig.setUrl(new URL("http://api.syncromatics.com/feed/511/Configuration/?api_key=593e3f10de49d7fec7c8ace98f0ee6d1&format=json"));
-		_providerConfig.generatesRouteAndStopsMap();
-		}catch(Exception ex){
+		try {
+			_providerConfig
+					.setUrl(new URL(
+							"http://api.syncromatics.com/feed/511/Configuration/?api_key=593e3f10de49d7fec7c8ace98f0ee6d1&format=json"));
+			_providerConfig.generatesRouteAndStopsMap();
+		} catch (Exception ex) {
 			_log.warn("Error in retriving confirmation data!", ex);
 		}
 		_log.info("starting GTFS-realtime service");
@@ -161,8 +166,10 @@ public class GtfsRealtimeProviderImpl {
 		/**
 		 * We download the vehicle details as an array of JSON objects.
 		 */
-		JSONArray vehicleArray = downloadVehicleDetails();
 
+		Pair pair = downloadVehicleDetails();
+		JSONArray stopIDsArray = pair.getArray1();
+		JSONArray vehicleArray = pair.getArray2();
 		/**
 		 * The FeedMessage.Builder is what we will use to build up our
 		 * GTFS-realtime feeds. We create a feed for both trip updates and
@@ -170,22 +177,27 @@ public class GtfsRealtimeProviderImpl {
 		 */
 		FeedMessage.Builder tripUpdates = GtfsRealtimeLibrary
 				.createFeedMessageBuilder();
-		// FeedMessage.Builder vehiclePositions =
-		// GtfsRealtimeLibrary.createFeedMessageBuilder();
+		FeedMessage.Builder vehiclePositions = GtfsRealtimeLibrary
+				.createFeedMessageBuilder();
 
 		/**
 		 * We iterate over every JSON vehicle object.
 		 */
-		for (int i = 0; i < vehicleArray.length(); i ++) {
 
-			JSONObject obj = vehicleArray.getJSONObject(i);
+		int step = 1;
+		int routeNumber;
+		String routeTitle;
+		String route;
 
-			int routeNumber = obj.getInt("route");
+		for (int i = 0; i < stopIDsArray.length(); i += step) {
 
-			String routeTitle = _providerConfig.routesMap.get(routeNumber);
-			String route = routeTitle.substring(6);
-			
-			
+			JSONObject obj = stopIDsArray.getJSONObject(i);
+
+			routeNumber = obj.getInt("route");
+
+			routeTitle = _providerConfig.routesMap.get(routeNumber);
+			route = routeTitle.substring(6);
+
 			int stopId_int = obj.getInt("stop");
 			StringBuilder stop = new StringBuilder();
 			stop.append("");
@@ -194,106 +206,152 @@ public class GtfsRealtimeProviderImpl {
 			String stopId = stop.toString();
 
 			JSONArray childArray = obj.getJSONArray("Ptimes");
-
-			double predictionTime;
+			long predictTime = 0;
+			long respTime = 0;
 			int delay = 0;
-			Date currentTime = new Date();
-			//for (int j = 0; j < childArray.length(); j++) {
-				JSONObject child = childArray.getJSONObject(0);
-				String timeStamp = child.getString("PredictionTime");
+			step = childArray.length();
+			for (int j = 0; j < childArray.length(); j++) {
+				JSONObject child = childArray.getJSONObject(j);
+				String predTimeStamp = child.getString("PredictionTime");
 
-				predictionTime = extractTime(timeStamp);
-				delay = (int) (predictionTime - currentTime.getTime()) / 1000 / 60;
-			//}
+				predictTime = convertTime(predTimeStamp) / 1000;
+				respTime = convertTime(responseTimeStamp) / 1000;
 
-			//double lat = obj.getDouble("lat");
-			//double lon = obj.getDouble("lon");
+				// System.out.println("predictionTime = " + predTimeStamp +
+				// "  ,  " + predictTime);
+				// System.out.println("responseTimeStamp = " + responseTimeStamp
+				// + "  ,  " + respTime);
 
-			/**
-			 * We construct a TripDescriptor and VehicleDescriptor, which will
-			 * be used in both trip updates and vehicle positions to identify
-			 * the trip and vehicle. Ideally, we would have a trip id to use for
-			 * the trip descriptor, but the SEPTA api doesn't include it, so we
-			 * settle for a route id instead.
-			 */
-			TripDescriptor.Builder tripDescriptor = TripDescriptor.newBuilder();
-			tripDescriptor.setRouteId(route);
+				delay = (int) (predictTime - respTime) / 60;
 
-			VehicleDescriptor.Builder vehicleDescriptor = VehicleDescriptor
-					.newBuilder();
-			String BusLabel = "Bus1";
-			vehicleDescriptor.setId(BusLabel);
+				/**
+				 * We construct a TripDescriptor and VehicleDescriptor, which
+				 * will be used in both trip updates and vehicle positions to
+				 * identify the trip and vehicle. Ideally, we would have a trip
+				 * id to use for the trip descriptor, but the SEPTA api doesn't
+				 * include it, so we settle for a route id instead.
+				 */
+				TripDescriptor.Builder tripDescriptor = TripDescriptor
+						.newBuilder();
+				tripDescriptor.setRouteId(route);
 
-			/**
-			 * To construct our TripUpdate, we create a stop-time arrival event
-			 * for the next stop for the vehicle, with the specified arrival
-			 * delay. We add the stop-time update to a TripUpdate builder, along
-			 * with the trip and vehicle descriptors.
-			 */
-			StopTimeEvent.Builder arrival = StopTimeEvent.newBuilder();
-			arrival.setDelay(delay);
-			
-			StopTimeUpdate.Builder stopTimeUpdate = StopTimeUpdate.newBuilder();
-			stopTimeUpdate.setArrival(arrival);
-			stopTimeUpdate.setStopId(stopId);
+				VehicleDescriptor.Builder vehicleDescriptor = VehicleDescriptor
+						.newBuilder();
+				String BusLabel = "BullRunnerBus";
+				vehicleDescriptor.setId(BusLabel);
 
-			TripUpdate.Builder tripUpdate = TripUpdate.newBuilder();
-			tripUpdate.addStopTimeUpdate(stopTimeUpdate);
-			tripUpdate.setTrip(tripDescriptor);
-			tripUpdate.setVehicle(vehicleDescriptor);
+				/**
+				 * To construct our TripUpdate, we create a stop-time arrival
+				 * event for the next stop for the vehicle, with the specified
+				 * arrival delay. We add the stop-time update to a TripUpdate
+				 * builder, along with the trip and vehicle descriptors.
+				 */
+				StopTimeEvent.Builder arrival = StopTimeEvent.newBuilder();
+				arrival.setDelay(delay);
+				arrival.setTime(predictTime);
+				StopTimeUpdate.Builder stopTimeUpdate = StopTimeUpdate
+						.newBuilder();
+				stopTimeUpdate.setArrival(arrival);
+				stopTimeUpdate.setStopId(stopId);
 
-			/**
-			 * Create a new feed entity to wrap the trip update and add it to
-			 * the GTFS-realtime trip updates feed.
-			 */
-			FeedEntity.Builder tripUpdateEntity = FeedEntity.newBuilder();
-			tripUpdateEntity.setId(route);
-			tripUpdateEntity.setTripUpdate(tripUpdate);
-			tripUpdates.addEntity(tripUpdateEntity);
+				TripUpdate.Builder tripUpdate = TripUpdate.newBuilder();
+				tripUpdate.addStopTimeUpdate(stopTimeUpdate);
+				tripUpdate.setTrip(tripDescriptor);
+				tripUpdate.setVehicle(vehicleDescriptor);
 
-			/**
-			 * To construct our VehiclePosition, we create a position for the
-			 * vehicle. We add the position to a VehiclePosition builder, along
-			 * with the trip and vehicle descriptors.
-			 */
+				/**
+				 * Create a new feed entity to wrap the trip update and add it
+				 * to the GTFS-realtime trip updates feed.
+				 */
+				FeedEntity.Builder tripUpdateEntity = FeedEntity.newBuilder();
+				tripUpdateEntity.setId(route);
+				tripUpdateEntity.setTripUpdate(tripUpdate);
+				tripUpdates.addEntity(tripUpdateEntity);
+			}
+		}
 
-			/*
-			 * Position.Builder position = Position.newBuilder();
-			 * position.setLatitude((float) lat); position.setLongitude((float)
-			 * lon);
-			 * 
-			 * VehiclePosition.Builder vehiclePosition = VehiclePosition
-			 * .newBuilder(); vehiclePosition.setPosition(position);
-			 * vehiclePosition.setTrip(tripDescriptor);
-			 * vehiclePosition.setVehicle(vehicleDescriptor);
-			 * 
-			 * /** Create a new feed entity to wrap the vehicle position and add
-			 * it to the GTFS-realtime vehicle positions feed.
-			 */
-			/*
-			 * FeedEntity.Builder vehiclePositionEntity =
-			 * FeedEntity.newBuilder();
-			 * vehiclePositionEntity.setId(trainNumber);
-			 * vehiclePositionEntity.setVehicle(vehiclePosition);
-			 * vehiclePositions.addEntity(vehiclePositionEntity);
-			 */
+		for (int k = 0; k < vehicleArray.length(); k++) {
+			JSONObject vehicleObj = vehicleArray.getJSONObject(k);
+
+			routeNumber = vehicleObj.getInt("route");
+
+			routeTitle = _providerConfig.routesMap.get(routeNumber);
+			route = routeTitle.substring(6);
+
+			JSONArray vehicleLocsArray = vehicleObj
+					.getJSONArray("VehicleLocation");
+
+			for (int l = 0; l < vehicleLocsArray.length(); ++l) {
+
+				JSONObject child = vehicleLocsArray.getJSONObject(l);
+				double lat = child.getDouble("vehicleLat");
+				double lon = child.getDouble("vehicleLat");
+				/**
+				 * To construct our VehiclePosition, we create a position for
+				 * the vehicle. We add the position to a VehiclePosition
+				 * builder, along with the trip and vehicle descriptors.
+				 */
+				TripDescriptor.Builder tripDescriptor = TripDescriptor
+						.newBuilder();
+				tripDescriptor.setRouteId(route);
+				Position.Builder position = Position.newBuilder();
+				position.setLatitude((float) lat);
+				position.setLongitude((float) lon);
+				VehiclePosition.Builder vehiclePosition = VehiclePosition
+						.newBuilder();
+				vehiclePosition.setPosition(position);
+				vehiclePosition.setTrip(tripDescriptor);
+
+				/**
+				 * Create a new feed entity to wrap the vehicle position and add
+				 * it to the GTFS-realtime vehicle positions feed.
+				 */
+				FeedEntity.Builder vehiclePositionEntity = FeedEntity
+						.newBuilder();
+				int tripID_int = child.getInt("tripId");
+				String TripID = Integer.toString(tripID_int);
+				vehiclePositionEntity.setId(TripID);
+				vehiclePositionEntity.setVehicle(vehiclePosition);
+				vehiclePositions.addEntity(vehiclePositionEntity);
+				// vehiclePosition.setVehicle(vehicleDescriptor);
+			}
+
 		}
 
 		/**
 		 * Build out the final GTFS-realtime feed messagse and save them.
 		 */
 		_gtfsRealtimeProvider.setTripUpdates(tripUpdates.build());
-		// _gtfsRealtimeProvider.setVehiclePositions(vehiclePositions.build());
+		_gtfsRealtimeProvider.setVehiclePositions(vehiclePositions.build());
 
-		_log.info("vehicles extracted: " + tripUpdates.getEntityCount());
+		_log.info("vehicles' location extracted: " + vehiclePositions.getEntityCount());
+		_log.info("stoIDs extracted: " + tripUpdates.getEntityCount());
 	}
 
 	/**
 	 * @return a JSON array parsed from the data pulled from the SEPTA vehicle
 	 *         data API.
 	 */
-	private JSONArray downloadVehicleDetails() throws IOException,
-			JSONException {
+	public class Pair {
+		private JSONArray array1;
+		private JSONArray array2;
+
+		public Pair(JSONArray array1, JSONArray array2) {
+			this.array1 = array1;
+			this.array2 = array2;
+
+		}
+
+		public JSONArray getArray1() {
+			return array1;
+		}
+
+		public JSONArray getArray2() {
+			return array2;
+		}
+	}
+
+	private Pair downloadVehicleDetails() throws IOException, JSONException {
 
 		BufferedReader reader = new BufferedReader(new InputStreamReader(
 				_url.openStream()));
@@ -312,8 +370,13 @@ public class GtfsRealtimeProviderImpl {
 		String data = child_obj.getString("PredictionData");
 
 		JSONObject child2_obj = new JSONObject(data);
-		JSONArray vehiclesArray = child2_obj.getJSONArray("StopPredictions");
-		return vehiclesArray;
+
+		responseTimeStamp = child2_obj.getString("TimeStamp");
+
+		JSONArray stopIDsArray = child2_obj.getJSONArray("StopPredictions");
+		JSONArray vehicleArray = child2_obj.getJSONArray("VehicleLocationData");
+
+		return new Pair(stopIDsArray, vehicleArray);
 	}
 
 	/**
@@ -334,15 +397,15 @@ public class GtfsRealtimeProviderImpl {
 	}
 
 	// This method extract time from timestamp
-	private double extractTime(String myTimeStamp) {
+	private long convertTime(String myTimeStamp) {
 
 		final SimpleDateFormat sdf = new SimpleDateFormat(
 				"yyyy-MM-dd'T'HH:mm:ssXXX");
-		Date predictionTime;// = new Date();
-		double result = 0;
+		Date time;// = new Date();
+		long result = 0;
 		try {
-			predictionTime = sdf.parse(myTimeStamp);
-			result = (double) predictionTime.getTime();
+			time = sdf.parse(myTimeStamp);
+			result = time.getTime();
 
 		} catch (ParseException e) {
 			// TODO Auto-generated catch block
