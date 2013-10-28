@@ -90,7 +90,7 @@ public class GtfsRealtimeProviderImpl {
 	/**
 	 * How often vehicle data will be downloaded, in seconds.
 	 */
-	private int _refreshInterval = 30;
+	private int _refreshInterval = 20;
 	private BullRunnerConfigExtract _providerConfig;
 
 	@Inject
@@ -188,7 +188,8 @@ public class GtfsRealtimeProviderImpl {
 		int routeNumber;
 		String routeTitle;
 		String route;
-
+ int tripfeedID = 0;
+ int vehicleFeedID = 0;
 		for (int i = 0; i < stopIDsArray.length(); i += step) {
 
 			JSONObject obj = stopIDsArray.getJSONObject(i);
@@ -235,10 +236,10 @@ public class GtfsRealtimeProviderImpl {
 						.newBuilder();
 				tripDescriptor.setRouteId(route);
 
-				VehicleDescriptor.Builder vehicleDescriptor = VehicleDescriptor
-						.newBuilder();
-				String BusLabel = "BullRunnerBus";
-				vehicleDescriptor.setId(BusLabel);
+				//VehicleDescriptor.Builder vehicleDescriptor = VehicleDescriptor
+						//.newBuilder();
+				//String BusLabel = "BullRunnerBus";
+				//vehicleDescriptor.setId(BusLabel);
 
 				/**
 				 * To construct our TripUpdate, we create a stop-time arrival
@@ -247,7 +248,7 @@ public class GtfsRealtimeProviderImpl {
 				 * builder, along with the trip and vehicle descriptors.
 				 */
 				StopTimeEvent.Builder arrival = StopTimeEvent.newBuilder();
-				arrival.setDelay(delay);
+				//arrival.setDelay(delay);
 				arrival.setTime(predictTime);
 				StopTimeUpdate.Builder stopTimeUpdate = StopTimeUpdate
 						.newBuilder();
@@ -257,14 +258,16 @@ public class GtfsRealtimeProviderImpl {
 				TripUpdate.Builder tripUpdate = TripUpdate.newBuilder();
 				tripUpdate.addStopTimeUpdate(stopTimeUpdate);
 				tripUpdate.setTrip(tripDescriptor);
-				tripUpdate.setVehicle(vehicleDescriptor);
+				//tripUpdate.setVehicle(vehicleDescriptor);
 
 				/**
 				 * Create a new feed entity to wrap the trip update and add it
 				 * to the GTFS-realtime trip updates feed.
 				 */
 				FeedEntity.Builder tripUpdateEntity = FeedEntity.newBuilder();
-				tripUpdateEntity.setId(route);
+				
+				tripfeedID ++;
+				tripUpdateEntity.setId(Integer.toString(tripfeedID));
 				tripUpdateEntity.setTripUpdate(tripUpdate);
 				tripUpdates.addEntity(tripUpdateEntity);
 			}
@@ -293,6 +296,7 @@ public class GtfsRealtimeProviderImpl {
 				 */
 				TripDescriptor.Builder tripDescriptor = TripDescriptor
 						.newBuilder();
+
 				tripDescriptor.setRouteId(route);
 				Position.Builder position = Position.newBuilder();
 				position.setLatitude((float) lat);
@@ -310,7 +314,8 @@ public class GtfsRealtimeProviderImpl {
 						.newBuilder();
 				int tripID_int = child.getInt("tripId");
 				String TripID = Integer.toString(tripID_int);
-				vehiclePositionEntity.setId(TripID);
+				vehicleFeedID ++;
+				vehiclePositionEntity.setId(Integer.toString(vehicleFeedID));
 				vehiclePositionEntity.setVehicle(vehiclePosition);
 				vehiclePositions.addEntity(vehiclePositionEntity);
 				// vehiclePosition.setVehicle(vehicleDescriptor);
