@@ -131,7 +131,7 @@ public class GtfsRealtimeProviderImpl {
 
 		try {
 			_providerConfig .setUrl(new URL( "http://api.syncromatics.com/feed/511/Configuration/?api_key=593e3f10de49d7fec7c8ace98f0ee6d1&format=json"));
-			_providerConfig.generatesRouteMap();
+			 //_providerConfig.generatesRouteMap();
 			_providerConfig.generateTripMap();
 			
 		} catch (Exception ex) {
@@ -195,11 +195,9 @@ public class GtfsRealtimeProviderImpl {
 
 			JSONObject obj = stopIDsArray.getJSONObject(i);
 
-			routeNumber = obj.getInt("route");
-
-			routeTitle = _providerConfig.routesMap.get(routeNumber);
+			routeTitle = obj.getString("route");
 			route = routeTitle.substring(6);
-			
+ 
 	 
 			trip = _providerConfig.tripIDMap.get(route);
 			
@@ -277,19 +275,20 @@ public class GtfsRealtimeProviderImpl {
 			}
 		}
 		
-
-	//	for (int k = 0; k < vehicleArray.length(); k++) {
-		for (int k = 0; k < 6; k++) {
+		for (int k = 0; k < vehicleArray.length(); k++) {
 			JSONObject vehicleObj = vehicleArray.getJSONObject(k);
 
-			routeNumber = vehicleObj.getInt("route");
-
-			routeTitle = _providerConfig.routesMap.get(routeNumber);
+			routeTitle = vehicleObj.getString("route");
+			
+			 
+			//routeNumber = obj.getInt("route");
+			//routeTitle = _providerConfig.routesMap.get(routeNumber);
  
 			route = routeTitle.substring(6);
 
 			JSONArray vehicleLocsArray = vehicleObj .getJSONArray("VehicleLocation");
 			
+
 
 			for (int l = 0; l < vehicleLocsArray.length(); ++l) {
 

@@ -17,6 +17,7 @@ public class BullRunnerConfigExtract {
 	private URL _url;
 	 private static final String path2tripsFile = "../myGTFS/trips.txt";
 	 private static final String path2calFile = "../myGTFS/calendar.txt";
+	 private static final String path2stopTimesFile = "../myGTFS/stop_times.txt";
 	/**
 	 * @param url
 	 *            the URL for the SEPTA vehicle data API.
@@ -73,6 +74,23 @@ public class BullRunnerConfigExtract {
 			routesMap.put(key, title);
 		}
 	}
+	
+	/**
+	 * this function extract the corresponding sequence ID for each stop ID from stop_times.txt in GTFS files
+	 * we need tripID and stopID to extract stop sequence 
+	 * @throws IOException
+	 */
+	/*public void generateSeqIdMap() throws IOException{
+		
+		String line;
+		
+		BufferedReader stop_times = new BufferedReader(new FileReader(path2stopTimesFile));
+		try{
+			line = stop_times.readLine();
+		}finally{
+			stop_times.close();
+		}
+	}*/
 	
 	
 	/**
