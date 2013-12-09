@@ -195,8 +195,8 @@ public class GtfsRealtimeProviderImpl {
 
 			JSONObject obj = stopIDsArray.getJSONObject(i);
 
-			routeTitle = obj.getString("route");
-			route = routeTitle.substring(6);
+			route = obj.getString("route");
+			//route = routeTitle.substring(6);
  
 	 
 			trip = _providerConfig.tripIDMap.get(route);
@@ -278,13 +278,16 @@ public class GtfsRealtimeProviderImpl {
 		for (int k = 0; k < vehicleArray.length(); k++) {
 			JSONObject vehicleObj = vehicleArray.getJSONObject(k);
 
-			routeTitle = vehicleObj.getString("route");
-			
+			route = vehicleObj.getString("route");
+			//route = routeTitle.substring(6);
+
+			//routeTitle = vehicleObj.getString("route");
+			//route = routeTitle.substring(6);
 			 
 			//routeNumber = obj.getInt("route");
 			//routeTitle = _providerConfig.routesMap.get(routeNumber);
  
-			route = routeTitle.substring(6);
+			
 
 			JSONArray vehicleLocsArray = vehicleObj .getJSONArray("VehicleLocation");
 			
