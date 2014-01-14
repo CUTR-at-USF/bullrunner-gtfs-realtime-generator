@@ -90,7 +90,7 @@ public class GtfsRealtimeProviderImpl {
 	/**
 	 * How often vehicle data will be downloaded, in seconds.
 	 */
-	private int _refreshInterval = 20;
+	private int _refreshInterval = 5;
 	private BullRunnerConfigExtract _providerConfig;
 
 	@Inject
@@ -131,8 +131,9 @@ public class GtfsRealtimeProviderImpl {
 
 		try {
 			_providerConfig .setUrl(new URL( "http://api.syncromatics.com/feed/511/Configuration/?api_key=593e3f10de49d7fec7c8ace98f0ee6d1&format=json"));
-			 //_providerConfig.generatesRouteMap();
+			//_providerConfig.generatesRouteMap();
 			_providerConfig.generateTripMap();
+			_providerConfig.extractSeqId();
 			
 		} catch (Exception ex) {
 			_log.warn("Error in retriving confirmation data!", ex);
@@ -195,9 +196,8 @@ public class GtfsRealtimeProviderImpl {
 
 			JSONObject obj = stopIDsArray.getJSONObject(i);
 
-			route = obj.getString("route");
-			//route = routeTitle.substring(6);
- 
+			routeTitle = obj.getString("route");
+			route = routeTitle.substring(6);
 	 
 			trip = _providerConfig.tripIDMap.get(route);
 			
@@ -256,11 +256,12 @@ public class GtfsRealtimeProviderImpl {
 						.newBuilder();
 				stopTimeUpdate.setArrival(arrival);
 				stopTimeUpdate.setStopId(stopId);
-
+				String stopSeq = _providerConfig.stopSeqIDMap.get(trip, stopId);
+				//System.out.println("trip = "+ trip+ ", stopSeq =" + Integer.parseInt(stopSeq)+ ", stopId =" + stopId);
+				stopTimeUpdate.setStopSequence(Integer.parseInt(stopSeq));
 				TripUpdate.Builder tripUpdate = TripUpdate.newBuilder();
 				tripUpdate.addStopTimeUpdate(stopTimeUpdate);
 				tripUpdate.setTrip(tripDescriptor);
-				//tripUpdate.setVehicle(vehicleDescriptor);
 
 				/**
 				 * Create a new feed entity to wrap the trip update and add it
@@ -278,11 +279,11 @@ public class GtfsRealtimeProviderImpl {
 		for (int k = 0; k < vehicleArray.length(); k++) {
 			JSONObject vehicleObj = vehicleArray.getJSONObject(k);
 
-			route = vehicleObj.getString("route");
+			//route = vehicleObj.getString("route");
 			//route = routeTitle.substring(6);
 
-			//routeTitle = vehicleObj.getString("route");
-			//route = routeTitle.substring(6);
+			routeTitle = vehicleObj.getString("route");
+			route = routeTitle.substring(6);
 			 
 			//routeNumber = obj.getInt("route");
 			//routeTitle = _providerConfig.routesMap.get(routeNumber);

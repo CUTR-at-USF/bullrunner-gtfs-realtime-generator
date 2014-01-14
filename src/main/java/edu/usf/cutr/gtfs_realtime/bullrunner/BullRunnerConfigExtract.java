@@ -12,6 +12,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
+
  
 public class BullRunnerConfigExtract {
 	private URL _url;
@@ -28,6 +29,8 @@ public class BullRunnerConfigExtract {
 
 	public HashMap<Integer, String> routesMap = new HashMap<Integer, String>();
 	public HashMap<String , String> tripIDMap = new HashMap<String, String>();
+	//public BiHashMap<Integer, Integer, Integer> stopSeqIDMap = new BiHashMap<Integer, Integer, Integer>();
+	public BiHashMap<String, String, String> stopSeqIDMap = new BiHashMap<String, String, String>();
 	/**
 	 * @return a JSON array parsed from the data pulled from the SEPTA vehicle
 	 *         data API.
@@ -74,25 +77,7 @@ public class BullRunnerConfigExtract {
 			routesMap.put(key, title);
 		}
 	}
-	
-	/**
-	 * this function extract the corresponding sequence ID for each stop ID from stop_times.txt in GTFS files
-	 * we need tripID and stopID to extract stop sequence 
-	 * @throws IOException
-	 */
-	/*public void generateSeqIdMap() throws IOException{
 		
-		String line;
-		
-		BufferedReader stop_times = new BufferedReader(new FileReader(path2stopTimesFile));
-		try{
-			line = stop_times.readLine();
-		}finally{
-			stop_times.close();
-		}
-	}*/
-	
-	
 	/**
 	 * create hash map of routeID ===> tripID 
 	 * for this it needs the path to gtfs/trip.txt and also serviceID which again use gtfs/calendar.txt
@@ -166,5 +151,48 @@ public class BullRunnerConfigExtract {
 
 	}
 
+	 /**
+	  * Associates the specified value with the specified keys in this map (optional operation). If the map previously
+	  * contained a mapping for the key, the old value is replaced by the specified value.
+	  * 
+	  * @param key1
+	  *            the first key
+	  * @param key2
+	  *            the second key
+	  * @param value
+	  *            the value to be set
+	  */
+  
+    /**
+	 * this function extract the corresponding sequence ID for each stop ID from stop_times.txt in GTFS files
+	 * we need tripID and stopID to extract stop sequence 
+	 * @throws IOException
+	 */
+	public void extractSeqId() throws IOException{
+		
+		String line;
+		String[] tokens;
+		String delims = "[,]+";
+		String stop_id="", trip_id ="", stop_sequence = "";
+		//Integer stop_id=0, trip_id =0, stop_sequence = 0;
 
+		BufferedReader stop_times = new BufferedReader(new FileReader(path2stopTimesFile));
+		try{
+			line = stop_times.readLine();
+			 while (line != null ) {
+				  line = stop_times.readLine();
+		 	       tokens = line.split(delims);
+		 	       trip_id = tokens[0];
+		 	       stop_id= tokens[3];
+		 	       stop_sequence = tokens[4]; 
+		 	      //System.out.println("tripID = "+ trip_id + ", stopID = " + stop_id + ", stopSeq = "+ stop_sequence);
+		         
+		 	      stopSeqIDMap.put(trip_id, stop_id, stop_sequence);		        	 
+		        }
+			//addElement(Integer key1, Integer key2, Integer value)
+		}finally{
+			stop_times.close();
+		}		
+	}
+	
 }
