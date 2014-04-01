@@ -15,6 +15,7 @@
  */
 package edu.usf.cutr.gtfs_realtime.bullrunner;
 
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -27,10 +28,12 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.TimeZone;
+import java.util.Vector;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.text.ParsePosition;
+
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
@@ -90,7 +93,7 @@ public class GtfsRealtimeProviderImpl {
 	/**
 	 * How often vehicle data will be downloaded, in seconds.
 	 */
-	private int _refreshInterval = 5;
+	private int _refreshInterval = 15;
 	private BullRunnerConfigExtract _providerConfig;
 
 	@Inject
@@ -192,11 +195,13 @@ public class GtfsRealtimeProviderImpl {
 		String route;
 		 int tripfeedID = 0;
 		 int vehicleFeedID = 0;
+ 
+
 		for (int i = 0; i < stopIDsArray.length(); i += step) {
 
 			JSONObject obj = stopIDsArray.getJSONObject(i);
 
-			routeTitle = obj.getString("route");
+			routeTitle = obj.getString("route"); 
 			route = routeTitle.substring(6);
 	 
 			trip = _providerConfig.tripIDMap.get(route);
@@ -213,7 +218,11 @@ public class GtfsRealtimeProviderImpl {
 			  predictTime = 0;
 			  respTime = 0;
 			  delay = 0;
-			step = childArray.length();
+			step = 1;// childArray.length();
+		//	System.out.println("stopId_int= " + stopId_int + ", step = "+ step);
+			if ( stopId_int == 449){
+				System.out.println("trip "+ trip);
+			}
 			for (int j = 0; j < childArray.length(); j++) {
 				JSONObject child = childArray.getJSONObject(j);
 				String predTimeStamp = child.getString("PredictionTime");
@@ -238,11 +247,6 @@ public class GtfsRealtimeProviderImpl {
 				tripDescriptor.setRouteId(route);
 				tripDescriptor.setTripId(trip);
 				 
-				//VehicleDescriptor.Builder vehicleDescriptor = VehicleDescriptor
-						//.newBuilder();
-				//String BusLabel = "BullRunnerBus";
-				//vehicleDescriptor.setId(BusLabel);
-
 				/**
 				 * To construct our TripUpdate, we create a stop-time arrival
 				 * event for the next stop for the vehicle, with the specified
@@ -275,7 +279,7 @@ public class GtfsRealtimeProviderImpl {
 				tripUpdates.addEntity(tripUpdateEntity);
 			}
 		}
-		
+
 		for (int k = 0; k < vehicleArray.length(); k++) {
 			JSONObject vehicleObj = vehicleArray.getJSONObject(k);
 
@@ -284,7 +288,7 @@ public class GtfsRealtimeProviderImpl {
 
 			routeTitle = vehicleObj.getString("route");
 			route = routeTitle.substring(6);
-			 
+		 
 			//routeNumber = obj.getInt("route");
 			//routeTitle = _providerConfig.routesMap.get(routeNumber);
  
@@ -292,8 +296,6 @@ public class GtfsRealtimeProviderImpl {
 
 			JSONArray vehicleLocsArray = vehicleObj .getJSONArray("VehicleLocation");
 			
-
-
 			for (int l = 0; l < vehicleLocsArray.length(); ++l) {
 
 				JSONObject child = vehicleLocsArray.getJSONObject(l);
@@ -339,13 +341,13 @@ public class GtfsRealtimeProviderImpl {
 		/**
 		 * Build out the final GTFS-realtime feed messagse and save them.
 		 */
-		_gtfsRealtimeProvider.setTripUpdates(tripUpdates.build());
+		 _gtfsRealtimeProvider.setTripUpdates(tripUpdates.build());
 		
 		
-		_gtfsRealtimeProvider.setVehiclePositions(vehiclePositions.build());
+		 _gtfsRealtimeProvider.setVehiclePositions(vehiclePositions.build());
 		
-		_log.info("vehicles' location extracted: " + vehiclePositions.getEntityCount());
-		_log.info("stoIDs extracted: " + tripUpdates.getEntityCount());
+		 _log.info("vehicles' location extracted: " + vehiclePositions.getEntityCount());
+		 _log.info("stoIDs extracted: " + tripUpdates.getEntityCount());
 	}// end of refresh!
 
 	
@@ -389,11 +391,15 @@ public class GtfsRealtimeProviderImpl {
 
 		JSONObject object = (JSONObject) new JSONTokener(builder.toString())
 				.nextValue();
-		String message = object.getString("PredictionDataMessage");
+//		String message = object.getString("PredictionDataMessage");
+//
+//		JSONObject child_obj = new JSONObject(message);
+//		String data = child_obj.getString("PredictionData");
 
-		JSONObject child_obj = new JSONObject(message);
-		String data = child_obj.getString("PredictionData");
+	 
+		String data = object.getString("PredictionData");
 
+		
 		JSONObject child2_obj = new JSONObject(data);
 
 		responseTimeStamp = child2_obj.getString("TimeStamp");
