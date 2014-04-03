@@ -19,6 +19,7 @@ public class BullRunnerConfigExtract {
 	 private static final String path2tripsFile = "../myGTFS/trips.txt";
 	 private static final String path2calFile = "../myGTFS/calendar.txt";
 	 private static final String path2stopTimesFile = "../myGTFS/stop_times.txt";
+	 private static final String path2frequenciesFile = "../myGTFS/frequencies.txt";
 	/**
 	 * @param url
 	 *            the URL for the SEPTA vehicle data API.
@@ -29,7 +30,7 @@ public class BullRunnerConfigExtract {
 
 	public HashMap<Integer, String> routesMap = new HashMap<Integer, String>();
 	public HashMap<String , String> tripIDMap = new HashMap<String, String>();
-	//public BiHashMap<Integer, Integer, Integer> stopSeqIDMap = new BiHashMap<Integer, Integer, Integer>();
+	public HashMap<String , String> startTimeByTripIDMap = new HashMap<String, String>();
 	public BiHashMap<String, String, String> stopSeqIDMap = new BiHashMap<String, String, String>();
 	/**
 	 * @return a JSON array parsed from the data pulled from the SEPTA vehicle
@@ -177,22 +178,62 @@ public class BullRunnerConfigExtract {
 		//Integer stop_id=0, trip_id =0, stop_sequence = 0;
 
 		BufferedReader stop_times = new BufferedReader(new FileReader(path2stopTimesFile));
+		line = stop_times.readLine();
+		
 		try{
 			line = stop_times.readLine();
 			 while (line != null ) {
-				  line = stop_times.readLine();
+				  
 		 	       tokens = line.split(delims);
 		 	       trip_id = tokens[0];
 		 	       stop_id= tokens[3];
 		 	       stop_sequence = tokens[4]; 
-		 	      //System.out.println("tripID = "+ trip_id + ", stopID = " + stop_id + ", stopSeq = "+ stop_sequence);
-		         
-		 	      stopSeqIDMap.put(trip_id, stop_id, stop_sequence);		        	 
+		 	     
+		 	      stopSeqIDMap.put(trip_id, stop_id, stop_sequence);	
+
+		 	     //System.out.println("tripID = "+ trip_id + ", stopID = " + stop_id + ", stopSeq = "+ stop_sequence);
+		 	    line = stop_times.readLine();
 		        }
-			//addElement(Integer key1, Integer key2, Integer value)
+			
 		}finally{
 			stop_times.close();
-		}		
+		}
+		if (stop_sequence.equals(""))
+	    	throw new RuntimeException("Cannot find the stop_sequence = " + stop_sequence + ", or stop_id= " + stop_id);
+
 	}
 	
+   /**
+	 * this function extract the corresponding start_time for each trip ID from frequencies.txt in GTFS files
+	 * @throws IOException
+	 */
+	public void extractStartTime() throws IOException{
+		
+		String line;
+		String[] tokens;
+		String delims = "[,]+";
+		BufferedReader  frequencies= null;
+		try{
+		  frequencies = new BufferedReader(new FileReader(path2frequenciesFile));
+		  line = frequencies.readLine();
+		  }catch(IOException e) {
+		        System.out.println("error, not able to open" + e);
+		}
+		String start_time = "";
+		String trip_id = "";
+		
+		try{
+			line = frequencies.readLine();
+			 while (line != null ) {
+				 tokens = line.split(delims);
+		 	     trip_id = tokens[0];
+		 	     start_time = tokens[1];
+		 	    startTimeByTripIDMap.put(trip_id, start_time);
+		 	   //System.out.println("tripID = "+ trip_id+ ", startTime = "+ start_time);
+		 	  line = frequencies.readLine();
+			 }
+		}finally{
+			frequencies.close();
+		}
+	}
 }

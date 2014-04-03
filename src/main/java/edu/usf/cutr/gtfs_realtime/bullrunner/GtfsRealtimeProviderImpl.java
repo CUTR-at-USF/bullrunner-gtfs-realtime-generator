@@ -27,6 +27,7 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
+import java.util.Locale;
 import java.util.TimeZone;
 import java.util.Vector;
 import java.util.concurrent.Executors;
@@ -137,6 +138,7 @@ public class GtfsRealtimeProviderImpl {
 			//_providerConfig.generatesRouteMap();
 			_providerConfig.generateTripMap();
 			_providerConfig.extractSeqId();
+			_providerConfig.extractStartTime();
 			
 		} catch (Exception ex) {
 			_log.warn("Error in retriving confirmation data!", ex);
@@ -166,7 +168,7 @@ public class GtfsRealtimeProviderImpl {
 	 * positions as a result.
 	 */
 	private void refreshVehicles() throws IOException, JSONException {
-
+		String startTime = "";
 		/**
 		 * We download the vehicle details as an array of JSON objects.
 		 */
@@ -247,6 +249,10 @@ public class GtfsRealtimeProviderImpl {
 				tripDescriptor.setRouteId(route);
 				tripDescriptor.setTripId(trip);
 				 
+				//add the start_times filed
+				startTime = _providerConfig.startTimeByTripIDMap.get(trip);
+				tripDescriptor.setStartTime(startTime);
+				
 				/**
 				 * To construct our TripUpdate, we create a stop-time arrival
 				 * event for the next stop for the vehicle, with the specified
@@ -348,10 +354,109 @@ public class GtfsRealtimeProviderImpl {
 		
 		 _log.info("vehicles' location extracted: " + vehiclePositions.getEntityCount());
 		 _log.info("stoIDs extracted: " + tripUpdates.getEntityCount());
-	}// end of refresh!
+	}// end of refresh
 
 	
-	
+	private void test_refreshVehicles() throws IOException, JSONException, ParseException {
+
+		String startTime = "";
+		 int tripfeedID = 0;
+		 int[] tripArr = new int [2];
+		 
+		 int[][] delayArr = new int [2][2];
+		 delayArr[0][0] = 4*60;
+		 delayArr[0][1] = 1*60;
+		 
+		 delayArr[1][0] = 3*60;
+		 delayArr[1][1] = 5*60;
+		 
+		 int[][] stopArr = new int [2][2];
+		 stopArr[0][0]= 401;
+		 stopArr[1][0]= 204;
+		 
+		 stopArr[0][1]= 801;
+		 stopArr[1][1]= 807;
+		 
+		 
+		 int stopId_int;
+		 
+		 FeedMessage.Builder tripUpdates = GtfsRealtimeLibrary.createFeedMessageBuilder();
+
+		for (int i = 0; i < tripArr.length; i += 1) {
+		//for (int i = 0; i < 1; i += 1) {
+
+
+			FeedEntity.Builder tripUpdateEntity = FeedEntity.newBuilder();
+			TripDescriptor.Builder tripDescriptor = TripDescriptor.newBuilder();
+		 
+			tripUpdateEntity.setId(Integer.toString(tripfeedID +1));
+			
+			StringBuilder tripI = new StringBuilder();
+			tripI.append("");
+			tripI.append(tripfeedID+1);
+			tripDescriptor.setTripId(tripI.toString());
+			
+			//add the start_times filed
+			startTime = _providerConfig.startTimeByTripIDMap.get(tripI.toString());
+			tripDescriptor.setStartTime(startTime);
+			System.out.println("tripID = "+ tripI.toString()+ ", startTime = "+ startTime);
+			
+			
+			 TripUpdate.Builder tripUpdate = TripUpdate.newBuilder();
+			tripUpdate.setTrip(tripDescriptor);
+			
+			for (int s=0; s < stopArr[i].length; s+=1){
+				
+				 StopTimeUpdate.Builder stopTimeUpdate = StopTimeUpdate.newBuilder();
+				 StopTimeEvent.Builder arrival = StopTimeEvent.newBuilder();
+				 
+				stopId_int = stopArr[s][i];
+				StringBuilder stop = new StringBuilder();
+				stop.append("");
+				stop.append(stopId_int);
+				String stopId = stop.toString();
+				stopTimeUpdate.setStopId(stopId);
+				
+				 
+				//Getting “unixtime”
+				//long unixtime2 = Date.parse("01-March-2014 07:00:00").getTime()/1000;
+		 
+				String ss = "01-April-2014 07:00:00 PDT";
+				String pattern = "dd-MMM-yyyy HH:mm:ss z";
+				Date date = new SimpleDateFormat(pattern, Locale.ENGLISH).parse(ss);
+				//DateTime unixTime = new DateTime(date.getTime());
+				//number of seconds that have elapsed since 00:00:00 Coordinated Universal Time (UTC), Thursday, 1 January 1970
+				//long unixTime = System.currentTimeMillis() / 1000L;
+				long unixTime = date.getTime()/1000;
+				//System.out.println("[tripfeedID][s]"+ tripfeedID + s+"unixTime =" + unixTime);
+				
+					
+				long timePlusDelay = unixTime + delayArr[tripfeedID][s];
+				System.out.println("trip= " + (int)(tripfeedID+1) + ", stopId ="+ stopId_int + ", delay in minutes= "+ (timePlusDelay-unixTime)/60);
+				arrival.setTime(timePlusDelay);
+				
+				//arrival.setDelay(delayArr[tripfeedID][s]);
+				
+				
+				
+				stopTimeUpdate.setStopSequence(s+1);
+				stopTimeUpdate.setArrival(arrival);
+				
+				tripUpdate.addStopTimeUpdate(stopTimeUpdate);
+				
+			}
+			System.out.println("----------next trip-----------------");
+			tripfeedID ++;
+			tripUpdateEntity.setTripUpdate(tripUpdate);
+			tripUpdates.addEntity(tripUpdateEntity);
+			 
+	}
+			 
+		_gtfsRealtimeProvider.setTripUpdates(tripUpdates.build());
+		 
+	 
+	}/// end of refresh!
+
 	
 	
 	
@@ -421,6 +526,7 @@ public class GtfsRealtimeProviderImpl {
 			try {
 				_log.info("refreshing vehicles");
 				refreshVehicles();
+				//test_refreshVehicles();
 			} catch (Exception ex) {
 				_log.warn("Error in vehicle refresh task", ex);
 			}
