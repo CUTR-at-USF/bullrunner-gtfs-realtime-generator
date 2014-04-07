@@ -368,7 +368,7 @@ public class GtfsRealtimeProviderImpl {
 		 delayArr[0][1] = 1*60;
 		 
 		 delayArr[1][0] = 3*60;
-		 delayArr[1][1] = 5*60;
+		 delayArr[1][1] = 8*60;
 		 
 		 int[][] stopArr = new int [2][2];
 		 stopArr[0][0]= 401;
@@ -421,7 +421,7 @@ public class GtfsRealtimeProviderImpl {
 				//Getting “unixtime”
 				//long unixtime2 = Date.parse("01-March-2014 07:00:00").getTime()/1000;
 		 
-				String ss = "01-April-2014 07:00:00 PDT";
+				String ss = "04-April-2014 07:00:00 PDT";
 				String pattern = "dd-MMM-yyyy HH:mm:ss z";
 				Date date = new SimpleDateFormat(pattern, Locale.ENGLISH).parse(ss);
 				//DateTime unixTime = new DateTime(date.getTime());
