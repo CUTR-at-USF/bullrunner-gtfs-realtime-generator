@@ -6,9 +6,10 @@ import java.util.Map;
 public class BiHashMap<K1, K2, V> {
 
 private final Map<K1, Map<K2, V>> mMap;
- 
+private int sizeOfMap; 
 public BiHashMap() {
     mMap = new HashMap<K1, Map<K2, V>>();
+    sizeOfMap = 0;
 }
 
 /**
@@ -24,6 +25,7 @@ public BiHashMap() {
  * @return the value previously associated with (key1,key2), or <code>null</code> if none
  * @see Map#put(Object, Object)
  */
+
 public void put(K1 key1, K2 key2, V value) {
     Map<K2, V> map;
     if (mMap.containsKey(key1)) {
@@ -33,8 +35,22 @@ public void put(K1 key1, K2 key2, V value) {
         mMap.put(key1, map);
     }
     map.put(key2, value);
+    sizeOfMap++;
 }
-
+public int getSize(){
+	return sizeOfMap;
+}
+public Boolean containsKey(K1 key1, K2 key2){
+	  Map<K2, V> map;
+	    if (mMap.containsKey(key1)) {
+	        map = mMap.get(key1);
+	        if(map.containsKey(key2))
+	        	return true;
+	        else
+	        	return false;
+	    }else
+	    	return false;
+}
 /**
  * Returns the value to which the specified key is mapped, or <code>null</code> if this map contains no mapping for
  * the key.
