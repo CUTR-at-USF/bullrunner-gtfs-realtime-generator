@@ -28,7 +28,7 @@ public class BullRunnerConfigExtract {
 		_url = url;
 	}
 
-	public HashMap<Integer, String> routesMap = new HashMap<Integer, String>();
+	public HashMap<String, Integer> routesMap = new HashMap<String, Integer>();
 	public HashMap<String , String> tripIDMap = new HashMap<String, String>();
 	public HashMap<String , String> startTimeByTripIDMap = new HashMap<String, String>();
 	public BiHashMap<String, String, String> stopSeqIDMap = new BiHashMap<String, String, String>();
@@ -47,18 +47,21 @@ public class BullRunnerConfigExtract {
 		while ((inputLine = reader.readLine()) != null)
 			builder.append(inputLine).append("\n");
 
-		JSONObject object = (JSONObject) new JSONTokener(builder.toString())
+		JSONObject object0 = (JSONObject) new JSONTokener(builder.toString())
 				.nextValue();
-
-		String message = object.getString("ConfigurationDataMessage");
-		JSONObject child_obj = new JSONObject(message);
-
-		String data = child_obj.getString("ConfigurationData");
-		JSONObject child2_obj = new JSONObject(data);
-
-		JSONArray configArray = child2_obj.getJSONArray("Route");
-
-		return configArray;
+		// JSONObject obj = (JSONObject) JSONValue.parse(builder.toString()); 
+	    // JSONArray array = (JSONArray)obj.get("response"); 
+	     JSONArray object = (JSONArray) new JSONTokener(builder.toString())
+			.nextValue(); 
+	        
+//		String message = object.getString("ConfigurationDataMessage");
+//		JSONObject child_obj = new JSONObject(message);
+//		String data = child_obj.getString("ConfigurationData");
+//		JSONObject child2_obj = new JSONObject(data);
+//
+//		JSONArray configArray = child2_obj.getJSONArray("Route");
+System.out.println("configArray = "+ object+", size = "+ object.length());
+		return object;
 	}
 
 	public void generatesRouteMap() throws IOException, JSONException {
@@ -68,14 +71,14 @@ public class BullRunnerConfigExtract {
 		for (int i = 0; i < configArray.length(); i++) {
 
 			JSONObject obj = configArray.getJSONObject(i);
-
-			int key = obj.getInt("key");
-			String title = obj.getString("title");
-			// StringBuilder sb = new StringBuilder();
-			// sb.append("");
-			// sb.append(key);
-			// String keySt = sb.toString();
-			routesMap.put(key, title);
+            /*
+             * "ID":423,
+      			"DisplayName":"A Route A",
+             */
+			int ID = obj.getInt("ID");
+			String route = obj.getString("DisplayName").substring(1);
+			System.out.println("ID , route"+ ID+ " , "+ route);
+			routesMap.put(route, ID);
 		}
 	}
 		

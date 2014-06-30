@@ -141,7 +141,7 @@ public class GtfsRealtimeProviderImpl {
 	public void start() {
 
 		try {
-			_providerConfig .setUrl(new URL( "http://api.syncromatics.com/feed/511/Configuration/?api_key=593e3f10de49d7fec7c8ace98f0ee6d1&format=json"));
+			_providerConfig .setUrl(new URL( "http://usfbullrunner.com/region/0/routes"));
 			//_providerConfig.generatesRouteMap();
 			_providerConfig.generateTripMap();
 			_providerConfig.extractSeqId();
@@ -198,9 +198,6 @@ public class GtfsRealtimeProviderImpl {
 		 List <stopTimeUpdateRecord> records = new ArrayList<stopTimeUpdateRecord>();
 		 
 		 for (int i = 0; i < stopIDsArray.length(); i ++) {
-		// System.out.println("stopID = "+ stopIDsArray.length()+ ", size = "+ tripUpdateMap.getSize());
-				 //System.out.println("---------------");
-			 
 				JSONObject obj = stopIDsArray.getJSONObject(i);
 				route = obj.getString("route").substring(6); 				
 				trip = _providerConfig.tripIDMap.get(route);			
@@ -227,8 +224,6 @@ public class GtfsRealtimeProviderImpl {
 						tripUpdate.setTrip(tripDescriptor);	
 						tripUpdateMap.put(route, vehicleId, tripUpdate);
 						tripUpdateArr.add(tripUpdate);
-						//Collections.sort(tripUpdate);
-						//System.out.println("new entry = route: "+ route+ ", vehicleID = "+ vehicleId);
 					}else{
 						tripUpdate = tripUpdateMap.get(route, vehicleId);
 						//System.out.println("OLD entry = route "+ route+ ", vehicleID = "+ vehicleId);
@@ -243,9 +238,9 @@ public class GtfsRealtimeProviderImpl {
 					stopSeq = _providerConfig.stopSeqIDMap.get(trip, stopId);
 					 if( stopSeq == null){
 						stopSeq = "0";
+						_log.warn("Error stopID: "+ stopId+ " is not available in GTFS files");
 						//System.out.println("Error: stopID: "+ stopId+ " is not available in GTFS files");
 					}
-					//System.out.println("trip = "+ trip+ ", stopSeq =" + Integer.parseInt(stopSeq)+ ", stopId =" + stopId);
 					stopTimeUpdate.setStopSequence(Integer.parseInt(stopSeq));
 					records.add(new stopTimeUpdateRecord(tripUpdate, stopTimeUpdate));
 					//tripUpdate.addStopTimeUpdate(stopTimeUpdate);							
@@ -270,7 +265,7 @@ public class GtfsRealtimeProviderImpl {
 					tripUpdates.addEntity(tripUpdateEntity);
 			 }
 			 _gtfsRealtimeProvider.setTripUpdates(tripUpdates.build());
-			 _log.info("stoIDs extracted: " + tripUpdates.getEntityCount());
+			// _log.info("stoIDs extracted: " + tripUpdates.getEntityCount());
 			
 			 for (int k = 0; k < vehicleArray.length(); k++) {
 					JSONObject vehicleObj = vehicleArray.getJSONObject(k);
@@ -320,7 +315,7 @@ public class GtfsRealtimeProviderImpl {
 					}
 		 		}
 			 _gtfsRealtimeProvider.setVehiclePositions(vehiclePositions.build());
-			 _log.info("vehicles' location extracted: " + vehiclePositions.getEntityCount());	
+			// _log.info("vehicles' location extracted: " + vehiclePositions.getEntityCount());	
 	}
 	private void refreshVehicles() throws IOException, JSONException {
 		String startTime = "";
@@ -433,7 +428,7 @@ public class GtfsRealtimeProviderImpl {
 			routeTitle = vehicleObj.getString("route");
 			route = routeTitle.substring(6);		 
 			//routeNumber = obj.getInt("route");
-			//routeTitle = _providerConfig.routesMap.get(routeNumber);			
+					
 			JSONArray vehicleLocsArray = vehicleObj .getJSONArray("VehicleLocation");
 			
 			for (int l = 0; l < vehicleLocsArray.length(); ++l) {
@@ -489,8 +484,8 @@ public class GtfsRealtimeProviderImpl {
 
 		 _gtfsRealtimeProvider.setVehiclePositions(vehiclePositions.build());
 		
-		 _log.info("vehicles' location extracted: " + vehiclePositions.getEntityCount());
-		 _log.info("stoIDs extracted: " + tripUpdates.getEntityCount());
+		// _log.info("vehicles' location extracted: " + vehiclePositions.getEntityCount());
+		// _log.info("stoIDs extracted: " + tripUpdates.getEntityCount());
 	}
 
 	
@@ -711,9 +706,13 @@ public class GtfsRealtimeProviderImpl {
 	}
 
 	private Pair downloadVehicleDetails() throws IOException, JSONException {
-
-		BufferedReader reader = new BufferedReader(new InputStreamReader(
+		BufferedReader reader = null;
+		try{
+			reader = new BufferedReader(new InputStreamReader(
 				_url.openStream()));
+		} catch (Exception ex) {
+			_log.error("Error in opening feeds url", ex);
+		}
 
 		StringBuilder builder = new StringBuilder();
 		String inputLine;
@@ -751,7 +750,7 @@ public class GtfsRealtimeProviderImpl {
 		@Override
 		public void run() {
 			try {
-				_log.info("refreshing vehicles");
+				//_log.info("refreshing vehicles");
 				//refreshVehicles();
 				refreshTripVehicle();
 				//test_refreshVehicles();
@@ -785,7 +784,13 @@ public class GtfsRealtimeProviderImpl {
 
 	}
 
+	private void extractHeading(String route){
+		int routeID = _providerConfig.routesMap.get(route);	
+		
+		String url = ""+ "http://usfbullrunner.com/route/"+ routeID+"/vehicles";
+		System.out.println("routeID = "+ routeID+ " "+ route+  ", url: "+ url);
 	
+	}
 	private class stopTimeUpdateRecord implements Comparable<stopTimeUpdateRecord> {
 		public StopTimeUpdate.Builder stopTimeUpdate;
 		public TripUpdate.Builder tripUpdate;
@@ -806,5 +811,5 @@ public class GtfsRealtimeProviderImpl {
 		            return -1;
 		}
 	}
- 
+
 }
