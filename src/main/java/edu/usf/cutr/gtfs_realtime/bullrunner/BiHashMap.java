@@ -40,6 +40,14 @@ public void put(K1 key1, K2 key2, V value) {
 public int getSize(){
 	return sizeOfMap;
 }
+
+public Boolean containsKey(K1 key1){
+	if (mMap.containsKey(key1)) 
+		return true;
+	else 
+		return false;
+}
+
 public Boolean containsKey(K1 key1, K2 key2){
 	  Map<K2, V> map;
 	    if (mMap.containsKey(key1)) {

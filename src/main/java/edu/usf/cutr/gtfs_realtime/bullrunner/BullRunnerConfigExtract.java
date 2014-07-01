@@ -15,7 +15,7 @@ import org.json.JSONTokener;
 
  
 public class BullRunnerConfigExtract {
-	private URL _url;
+	//private URL _url;
 	 private static final String path2tripsFile = "../myGTFS/trips.txt";
 	 private static final String path2calFile = "../myGTFS/calendar.txt";
 	 private static final String path2stopTimesFile = "../myGTFS/stop_times.txt";
@@ -24,9 +24,9 @@ public class BullRunnerConfigExtract {
 	 * @param url
 	 *            the URL for the SEPTA vehicle data API.
 	 */
-	public void setUrl(URL url) {
-		_url = url;
-	}
+//	public void setUrl(URL url) {
+//		_url = url;
+//	}
 
 	public HashMap<String, Integer> routesMap = new HashMap<String, Integer>();
 	public HashMap<String , String> tripIDMap = new HashMap<String, String>();
@@ -36,7 +36,7 @@ public class BullRunnerConfigExtract {
 	 * @return a JSON array parsed from the data pulled from the SEPTA vehicle
 	 *         data API.
 	 */
-	private JSONArray downloadCofiguration() throws IOException, JSONException {
+	public JSONArray downloadCofiguration(URL _url) throws IOException, JSONException {
 
 		BufferedReader reader = new BufferedReader(new InputStreamReader(
 				_url.openStream()));
@@ -46,27 +46,16 @@ public class BullRunnerConfigExtract {
 
 		while ((inputLine = reader.readLine()) != null)
 			builder.append(inputLine).append("\n");
-
-		JSONObject object0 = (JSONObject) new JSONTokener(builder.toString())
-				.nextValue();
-		// JSONObject obj = (JSONObject) JSONValue.parse(builder.toString()); 
-	    // JSONArray array = (JSONArray)obj.get("response"); 
+ 
 	     JSONArray object = (JSONArray) new JSONTokener(builder.toString())
 			.nextValue(); 
-	        
-//		String message = object.getString("ConfigurationDataMessage");
-//		JSONObject child_obj = new JSONObject(message);
-//		String data = child_obj.getString("ConfigurationData");
-//		JSONObject child2_obj = new JSONObject(data);
-//
-//		JSONArray configArray = child2_obj.getJSONArray("Route");
-System.out.println("configArray = "+ object+", size = "+ object.length());
+	     
 		return object;
 	}
 
-	public void generatesRouteMap() throws IOException, JSONException {
+	public void generatesRouteMap(URL _url) throws IOException, JSONException {
 
-		JSONArray configArray = downloadCofiguration();
+		JSONArray configArray = downloadCofiguration(_url);
 
 		for (int i = 0; i < configArray.length(); i++) {
 
@@ -76,8 +65,8 @@ System.out.println("configArray = "+ object+", size = "+ object.length());
       			"DisplayName":"A Route A",
              */
 			int ID = obj.getInt("ID");
-			String route = obj.getString("DisplayName").substring(1);
-			System.out.println("ID , route"+ ID+ " , "+ route);
+			String route = obj.getString("DisplayName").substring(0, 1);
+			//System.out.println("ID , route; "+ ID+ " , "+ route);
 			routesMap.put(route, ID);
 		}
 	}
