@@ -92,11 +92,8 @@ public class GtfsRealtimeTripUpdatesProducerDemoMain {
 		Injector injector = Guice.createInjector(modules);
 		injector.injectMembers(this);
 
-		// _provider.setUrl(new
-		// URL("http://www3.septa.org/hackathon/TrainView/"));
-//		_providerConfig.setUrl(new URL("http://api.syncromatics.com/feed/511/Configuration/?api_key=593e3f10de49d7fec7c8ace98f0ee6d1&format=json"));
-//		_providerConfig.generatesRouteAndStopsMap();
-	
+		 
+		 
 		_provider.setUrl(new URL( "http://api.syncromatics.com/feed/511/Prediction/?api_key=593e3f10de49d7fec7c8ace98f0ee6d1&format=json"));
 		
 		if (cli.hasOption(ARG_TRIP_UPDATES_URL)) {

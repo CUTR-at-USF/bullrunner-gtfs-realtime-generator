@@ -77,8 +77,6 @@ public class BullRunnerConfigExtract {
 	 */
 	public void generateTripMap() throws IOException{
 		
- 
-		
 		String route_id="", line, trip_id ="", service_id = "";
 				
 		int DAY_OF_WEEK, order_DayOfWeek, notFound = 1;
@@ -87,7 +85,7 @@ public class BullRunnerConfigExtract {
 		
 		Calendar cal = Calendar.getInstance();
 		 DAY_OF_WEEK = cal.get(Calendar.DAY_OF_WEEK) -1;
-		//System.out.println(DAY_OF_WEEK);
+		System.out.println(DAY_OF_WEEK);
 		
 		 //extracting the service_id for today!
 		BufferedReader  tripCal = new BufferedReader(new FileReader(path2calFile));
