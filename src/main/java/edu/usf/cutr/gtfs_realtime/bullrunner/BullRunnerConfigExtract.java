@@ -1,10 +1,12 @@
 package edu.usf.cutr.gtfs_realtime.bullrunner;
 
+import java.awt.List;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
 
@@ -18,6 +20,7 @@ public class BullRunnerConfigExtract {
 	//private URL _url;
 	 private static final String path2tripsFile = "../myGTFS/trips.txt";
 	 private static final String path2calFile = "../myGTFS/calendar.txt";
+	 private static final String path2routeFile = "../myGTFS/routes.txt";
 	 private static final String path2stopTimesFile = "../myGTFS/stop_times.txt";
 	 private static final String path2frequenciesFile = "../myGTFS/frequencies.txt";
 	/**
@@ -29,7 +32,9 @@ public class BullRunnerConfigExtract {
 //	}
 
 	public HashMap<String, Integer> routesMap = new HashMap<String, Integer>();
-	public HashMap<String , String> tripIDMap = new HashMap<String, String>();
+	//public HashMap<Integer , String> serviceIDMap = new HashMap<Integer, String>();
+	public String[] serviceIds = new String[7];  
+	public BiHashMap<String , String, String> tripIDMap = new BiHashMap<String, String, String>();
 	public HashMap<String , String> startTimeByTripIDMap = new HashMap<String, String>();
 	public BiHashMap<String, String, String> stopSeqIDMap = new BiHashMap<String, String, String>();
 	/**
@@ -52,7 +57,7 @@ public class BullRunnerConfigExtract {
 	     
 		return object;
 	}
-
+	
 	public void generatesRouteMap(URL _url) throws IOException, JSONException {
 
 		JSONArray configArray = downloadCofiguration(_url);
@@ -71,76 +76,41 @@ public class BullRunnerConfigExtract {
 		}
 	}
 		
-	/**
-	 * create hash map of routeID ===> tripID 
-	 * for this it needs the path to gtfs/trip.txt and also serviceID which again use gtfs/calendar.txt
-	 */
+	//extracting the service_id for dayOfWeek
+	public void generateServiceMap()throws IOException{
+		String splitBy = ",";
+		String line;
+		BufferedReader servicesBuffer = new BufferedReader(new FileReader(path2calFile));	 
+		line = servicesBuffer.readLine(); 	
+		while((line = servicesBuffer.readLine())!= null ){
+			String[] tokens = line.split(splitBy);
+			for (int i = 1; i<= 7; i++){
+				int day = Integer.parseInt(tokens[i]);
+				if (day == 1){
+					if (i != 7)
+						serviceIds[i] = tokens[0];
+					else
+						serviceIds[0] = tokens[0];
+				}
+			}		 
+		}
+	}
 	public void generateTripMap() throws IOException{
 		
-		String route_id="", line, trip_id ="", service_id = "";
-				
-		int DAY_OF_WEEK, order_DayOfWeek, notFound = 1;
-		String[] tokens;
-		String delims = "[,]+";
-		
-		Calendar cal = Calendar.getInstance();
-		 DAY_OF_WEEK = cal.get(Calendar.DAY_OF_WEEK) -1;
-		System.out.println(DAY_OF_WEEK);
-		
-		 //extracting the service_id for today!
-		BufferedReader  tripCal = new BufferedReader(new FileReader(path2calFile));
-	    try {
+		String  line; 
+		BufferedReader tripsBuffer = new BufferedReader(new FileReader(path2tripsFile));
+			
+		String splitBy = ",";
+		line = tripsBuffer.readLine(); 	
+		while((line = tripsBuffer.readLine())!= null ){
+			String [] tripRoute = line.split(splitBy);
+			//System.out.println(tripRoute[0]+" , "+ tripRoute[1]+" , "+ tripRoute[2]);
+			tripIDMap.put(tripRoute[0], tripRoute[1], tripRoute[2]);
+		}   
 
-	        line = tripCal.readLine();
-	        
-	        while (line != null && notFound == 1) {
-	            line = tripCal.readLine();	            
-	            tokens = line.split(delims);
-	            if (DAY_OF_WEEK != 0 )
-	            	order_DayOfWeek = DAY_OF_WEEK%7;
-	            else
-	            	order_DayOfWeek = 7;
-	            if (tokens[order_DayOfWeek].equals("1")){
-	            	notFound = 0;
-	            	service_id = tokens[0];
-	            
-	            }
-	            	
-	        }
-	    } finally {
-	    	tripCal.close();
-	    }
-		  
+  } 
+	    
 		 
-	    // extracting the trip_id
-	    notFound = 1;
-	    BufferedReader trips = new BufferedReader(new FileReader(path2tripsFile));
-	    //it is just the headers, and we throw it away
-	    line = trips.readLine();
-	    try {
- 
-	        line = trips.readLine();
- 
-	        while (line != null ) {
-	        	
-	 	        tokens = line.split(delims);
-	        	route_id = tokens[0];
-
-	        	if (tokens[1].equals(service_id)){
-	        		trip_id = tokens[2];
-	        		tripIDMap.put(route_id, trip_id);
-	        		//System.out.println("route_id = "+route_id + "trip_id = " + trip_id);
-	        	}
-	        	line = trips.readLine();
-	        }
-	     
-	    } finally {
-	    	trips.close();
-	    }
-	    if (trip_id.equals(""))
-	    	throw new RuntimeException("Cannot find the route_id = " + route_id + ", or Service_id= " + service_id);
-
-	}
 
 	 /**
 	  * Associates the specified value with the specified keys in this map (optional operation). If the map previously

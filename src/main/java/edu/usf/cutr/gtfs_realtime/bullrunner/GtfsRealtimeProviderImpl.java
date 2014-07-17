@@ -146,6 +146,7 @@ public class GtfsRealtimeProviderImpl {
 			//_providerConfig .setUrl(new URL( "http://usfbullrunner.com/region/0/routes"));
 			_providerConfig.generatesRouteMap(new URL( "http://usfbullrunner.com/region/0/routes"));
 			_providerConfig.generateTripMap();
+			_providerConfig.generateServiceMap();
 			_providerConfig.extractSeqId();
 			_providerConfig.extractStartTime();
 			
@@ -184,6 +185,10 @@ public class GtfsRealtimeProviderImpl {
 		JSONArray stopIDsArray = pair.getArray1();
 		JSONArray vehicleArray = pair.getArray2();
 		
+		Calendar cal = Calendar.getInstance();
+		int dayOfWeek = cal.get(Calendar.DAY_OF_WEEK) -1;
+		String serviceID = _providerConfig.serviceIds[dayOfWeek];
+		System.out.println(dayOfWeek + " , "+ serviceID);
 		FeedMessage.Builder tripUpdates = GtfsRealtimeLibrary.createFeedMessageBuilder();
 		
 		FeedMessage.Builder vehiclePositions = GtfsRealtimeLibrary.createFeedMessageBuilder();
@@ -206,7 +211,10 @@ public class GtfsRealtimeProviderImpl {
 		 for (int i = 0; i < stopIDsArray.length(); i ++) {
 				JSONObject obj = stopIDsArray.getJSONObject(i);
 				route = obj.getString("route").substring(6); 			
-				trip = _providerConfig.tripIDMap.get(route);	
+				//trip = _providerConfig.tripIDMap.get(route);
+				trip = _providerConfig.tripIDMap.get(route, serviceID);	
+				if (trip.equals("") || trip == null)
+					_log.error("Route "+ route+ "dosn't exit in GTFS file");
 				int stopId_int = obj.getInt("stop");
 				stopId = Integer.toString(stopId_int);
 				JSONArray childArray = obj.getJSONArray("Ptimes");			 
