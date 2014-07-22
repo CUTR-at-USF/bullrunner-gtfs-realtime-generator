@@ -188,7 +188,7 @@ public class GtfsRealtimeProviderImpl {
 		Calendar cal = Calendar.getInstance();
 		int dayOfWeek = cal.get(Calendar.DAY_OF_WEEK) -1;
 		String serviceID = _providerConfig.serviceIds[dayOfWeek];
-		System.out.println(dayOfWeek + " , "+ serviceID);
+		//System.out.println(dayOfWeek + " , "+ serviceID);
 		FeedMessage.Builder tripUpdates = GtfsRealtimeLibrary.createFeedMessageBuilder();
 		
 		FeedMessage.Builder vehiclePositions = GtfsRealtimeLibrary.createFeedMessageBuilder();
