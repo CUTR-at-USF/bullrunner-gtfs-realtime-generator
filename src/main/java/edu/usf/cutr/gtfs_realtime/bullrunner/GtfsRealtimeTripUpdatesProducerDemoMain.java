@@ -95,7 +95,9 @@ public class GtfsRealtimeTripUpdatesProducerDemoMain {
 		 
 		 
 		_provider.setUrl(new URL( "http://api.syncromatics.com/feed/511/Prediction/?api_key=593e3f10de49d7fec7c8ace98f0ee6d1&format=json"));
-		
+		//only for test, creat a static json for 8:32pm, August 5th, 2014
+	    //_provider.setUrl(new URL( "http://myweb.usf.edu/~mona2/syncromticOffLine_8_32August5.json"));
+			
 		if (cli.hasOption(ARG_TRIP_UPDATES_URL)) {
 			URL url = new URL(cli.getOptionValue(ARG_TRIP_UPDATES_URL));
 			TripUpdatesServlet servlet = injector

@@ -148,11 +148,15 @@ public class BullRunnerConfigExtract {
 		 	       trip_id = tokens[0];
 		 	       stop_id= tokens[3];
 		 	       stop_sequence = tokens[4]; 
-		 	     
-		 	      stopSeqIDMap.put(trip_id, stop_id, stop_sequence);	
-
-		 	     //System.out.println("tripID = "+ trip_id + ", stopID = " + stop_id + ", stopSeq = "+ stop_sequence);
-		 	    line = stop_times.readLine();
+		 	       String preStopSeq = "";
+		 	     try {
+		 	    	preStopSeq = stopSeqIDMap.get(trip_id, stop_id);
+		 	     }catch(NullPointerException e){
+		 	    	 
+		 	     }    
+		 	    if (preStopSeq == null)
+		 	    	stopSeqIDMap.put(trip_id, stop_id, stop_sequence);	
+		 	     line = stop_times.readLine();
 		        }
 			
 		}finally{
