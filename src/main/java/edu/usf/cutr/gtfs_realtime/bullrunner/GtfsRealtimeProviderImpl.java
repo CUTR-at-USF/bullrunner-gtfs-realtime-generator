@@ -44,6 +44,9 @@ import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
+import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -103,7 +106,7 @@ public class GtfsRealtimeProviderImpl {
 	/**
 	 * How often vehicle data will be downloaded, in seconds.
 	 */
-	private int _refreshInterval = 5;
+	private int _refreshInterval = 15;
 	private BullRunnerConfigExtract _providerConfig;
 
 	@Inject
@@ -184,11 +187,17 @@ public class GtfsRealtimeProviderImpl {
 		
 		JSONArray stopIDsArray = pair.getArray1();
 		JSONArray vehicleArray = pair.getArray2();
+		//BiHashMap<String, String, String> routeVehicleStartTimeMap = new BiHashMap<String, String, String>();
+		BiHashMap<String, String, StartTimes> routeVehicleStartTimeMap = new BiHashMap<String, String, StartTimes>();
 		
+		if (stopIDsArray.length() == 0) {
+			System.out.println("No updates available");
+			routeVehicleStartTimeMap.clear();
+		}
 		Calendar cal = Calendar.getInstance();
 		int dayOfWeek = cal.get(Calendar.DAY_OF_WEEK) -1;
 		String serviceID = _providerConfig.serviceIds[dayOfWeek];
-		//System.out.println(dayOfWeek + " , "+ serviceID);
+ 
 		FeedMessage.Builder tripUpdates = GtfsRealtimeLibrary.createFeedMessageBuilder();
 		
 		FeedMessage.Builder vehiclePositions = GtfsRealtimeLibrary.createFeedMessageBuilder();
@@ -197,6 +206,7 @@ public class GtfsRealtimeProviderImpl {
 		 int entity = 0;
 		 int vehicleFeedID = 0;
 		 String stopId = "";
+		 String startTime = "";
 		 String stopSeq;
 		 long predictTime = 0;
 		 TripUpdate.Builder tripUpdate = null;
@@ -207,7 +217,7 @@ public class GtfsRealtimeProviderImpl {
 		 List <stopTimeUpdateRecord> records = new ArrayList<stopTimeUpdateRecord>();
 		 routeVehiDirMap = new BiHashMap<String, String, Float>();
 		 tripVehicleInfoMap = new BiHashMap<String, String, vehicleInfo>();
-		 
+		  
 		 for (int i = 0; i < stopIDsArray.length(); i ++) {
 				JSONObject obj = stopIDsArray.getJSONObject(i);
 				route = obj.getString("route").substring(6); 			
@@ -223,7 +233,7 @@ public class GtfsRealtimeProviderImpl {
 					
 					JSONObject child = childArray.getJSONObject(j);
 					String predTimeStamp = child.getString("PredictionTime");
-					predictTime = convertTime(predTimeStamp) / 1000;
+					predictTime = convertTime(predTimeStamp);
 					String vehicleId = child.getString("VehicleId");
 					
 					if (!tripUpdateMap.containsKey(route, vehicleId)){
@@ -231,7 +241,9 @@ public class GtfsRealtimeProviderImpl {
 						vehicleDescriptor = VehicleDescriptor.newBuilder();
 						vehicleDescriptor.setId(vehicleId);
 						tripDescriptor = TripDescriptor.newBuilder();
-						tripDescriptor.setScheduleRelationship(ScheduleRelationship.UNSCHEDULED);
+						//tripDescriptor.setScheduleRelationship(ScheduleRelationship.UNSCHEDULED);
+						//startTime = _providerConfig.startTimeByTripIDMap.get(trip);
+						
 						tripDescriptor.setRouteId(route);
 						tripDescriptor.setTripId(trip);
 						tripUpdate.setVehicle(vehicleDescriptor);
@@ -239,8 +251,7 @@ public class GtfsRealtimeProviderImpl {
 						tripUpdateMap.put(route, vehicleId, tripUpdate);
 						tripUpdateArr.add(tripUpdate);
 					}else{
-						tripUpdate = tripUpdateMap.get(route, vehicleId);
-						
+						tripUpdate = tripUpdateMap.get(route, vehicleId);		
 						//System.out.println("OLD entry = route "+ route+ ", vehicleID = "+ vehicleId);
 					}
 					
@@ -254,7 +265,26 @@ public class GtfsRealtimeProviderImpl {
 					 if( stopSeq == null){
 						stopSeq = "0";
 						_log.warn("Error stopID: "+ stopId+ " is not available in GTFS files");
-						//System.out.println("Error: stopID: "+ stopId+ " is not available in GTFS files");
+						System.out.println("Error: stopID: "+ stopId+ " is not available in GTFS files");
+					}
+					 
+					if (stopSeq.equals("1")){
+						startTime = convert2FormattedTime(predTimeStamp);
+						//System.out.println("pre starttime = "+ tripUpdate.getTrip().getStartTime());
+						//update start time
+						tripDescriptor.setStartTime(startTime);		
+						tripUpdate.setTrip(tripDescriptor);
+						 
+						if (routeVehicleStartTimeMap.containsKeys(route, vehicleId)){
+							StartTimes startTimes= routeVehicleStartTimeMap.get(route, vehicleId);
+							startTimes.previousStartT = startTimes.currentStartT;
+							startTimes.currentStartT = startTime;
+						} else{
+							StartTimes startTimesInstance = new StartTimes(startTime, "0");
+							System.out.println("route, vehicleId = "+ route + " , "+ vehicleId);
+							routeVehicleStartTimeMap.put(route, vehicleId, startTimesInstance);
+						}
+						//System.out.println("current starttime = "+ tripUpdate.getTrip().getStartTime());
 					}
 					stopTimeUpdate.setStopSequence(Integer.parseInt(stopSeq));
 					records.add(new stopTimeUpdateRecord(tripUpdate, stopTimeUpdate));
@@ -262,28 +292,81 @@ public class GtfsRealtimeProviderImpl {
 				}				
 		 }
 		 Collections.sort(records);
-		 for (int i=0; i< records.size();i++){
+		 
+		
+		 for (int i=0; i< records.size();i++){  
 			 records.get(i).tripUpdate.addStopTimeUpdate(records.get(i).stopTimeUpdate);
 		 }
-				/**
-				 * Create a new feed entity to wrap the trip update and add it
-				 * to the GTFS-realtime trip updates feed.
-				 */	
-			 //System.out.println("len updtes = "+ tripUpdateArr.size()+ ", hass = "+  tripUpdateMap.getSize());
-			 for (int j = 0; j < tripUpdateArr.size(); j++){
-					FeedEntity.Builder tripUpdateEntity = FeedEntity.newBuilder();
-					tripUpdate = tripUpdateArr.get(j);
-					entity ++;
+		 
+		/**
+		 * Create a new feed entity to wrap the trip update and add it
+		 * to the GTFS-realtime trip updates feed.
+		 */	
+		
+		 for (int j = 0; j < tripUpdateArr.size(); j++){
+			FeedEntity.Builder tripUpdateEntity = FeedEntity.newBuilder();
+			tripUpdate = tripUpdateArr.get(j);
+			System.out.println("-----size of trip Updates = " + tripUpdate.getStopTimeUpdateList().size());
+			
+			int noStopTimes = tripUpdate.getStopTimeUpdateList().size();
+			route = tripUpdate.getTrip().getRouteId();
+			trip = tripUpdate.getTrip().getTripId();
+			String vehicleId = tripUpdate.getVehicle().getId();
+			System.out.println("route = "+ route+ ", vehicleId = "+ vehicleId);
+			
+			long preTime = 0;
+			for(int h= 0; h < noStopTimes; h++){
+				
+				long myTimeStamp = tripUpdate.getStopTimeUpdate(h).getArrival().getTime();
+				System.out.println("stopTime, h= "+ h+ ", seq = "+ tripUpdate.getStopTimeUpdate(h).getStopSequence() +" , "+ myTimeStamp);
+		
+				if ((tripUpdate.getStopTimeUpdate(h).getArrival().getTime() < preTime) && (0 <= tripUpdate.getStopTimeUpdate(h).getArrival().getTime())){
+					System.out.println("^^^^^^^^^should come here once: h= "+ h);
+					List <StopTimeUpdate> allStopUpdates = tripUpdate.getStopTimeUpdateList();
+					tripUpdate.clearStopTimeUpdate();
+					TripUpdate.Builder newTripUpdate = tripUpdate.clone();
 					 
+					// we have to send out the old tripUpdate, but before that the rest of stopTimes should be deleted from it		
+					newTripUpdate.addAllStopTimeUpdate(allStopUpdates.subList(0, h));
+					entity ++; 
 					tripUpdateEntity.setId(Integer.toString(entity));
-					tripUpdateEntity.setTripUpdate(tripUpdate);
+					tripUpdateEntity.setTripUpdate(newTripUpdate);
 					tripUpdates.addEntity(tripUpdateEntity);
-			 }
-			 _gtfsRealtimeProvider.setTripUpdates(tripUpdates.build());
-			  
+					System.out.println("what has been sent: size = "+ newTripUpdate.getStopTimeUpdateList().size()+ " stoptime");
+					
+					tripUpdate.addAllStopTimeUpdate(allStopUpdates.subList(h, noStopTimes));
+					System.out.println("current tripUpdate size = "+ tripUpdate.getStopTimeUpdateList().size()+ " stoptime");
+					preTime = 0;
+					noStopTimes = noStopTimes - h;
+					h = -1; 
+					
+					StartTimes startTimes= routeVehicleStartTimeMap.get(route, vehicleId);
+					
+					String previousStartT = startTimes.previousStartT;
+					//TripDescriptor currentTrip = newTripUpdate.getTrip();
+					TripDescriptor.Builder newTripDescriptor = TripDescriptor.newBuilder();
+					newTripDescriptor.setTripId(trip);
+					newTripDescriptor.setRouteId(route);
+					newTripDescriptor.setStartTime(previousStartT);
+					tripUpdate.setTrip(newTripDescriptor);
+					System.out.println("old start time = "+ tripUpdate.getTrip().getStartTime()+ ", new startTime = "+ newTripUpdate.getTrip().getStartTime());
+				}
+				else
+					preTime = tripUpdate.getStopTimeUpdate(h).getArrival().getTime();
+			}
+			System.out.println("++++++++++++++++++++++++++++++++++++++++++++++");
+			entity ++;
+			 
+			tripUpdateEntity.setId(Integer.toString(entity));
+			tripUpdateEntity.setTripUpdate(tripUpdate);
+			tripUpdates.addEntity(tripUpdateEntity);
+		 }
+		 _gtfsRealtimeProvider.setTripUpdates(tripUpdates.build());
+		  
 			// _log.info("stoIDs extracted: " + tripUpdates.getEntityCount());
 			 System.out.println("stoIDs extracted: " + tripUpdates.getEntityCount());
 			
+			 
 			 
 			 float bearing;
 			 for (int k = 0; k < vehicleArray.length(); k++) {
@@ -369,11 +452,6 @@ public class GtfsRealtimeProviderImpl {
 		 
 		 stopArr.get(1)[0] = 401;
 		 stopArr.get(1)[1] = 801;
-		  
-		 //stopArr[1][2]= 158;
-		 
-		// stopArr[1][0]= 401;
-		// stopArr[1][1]= 801;
 		
 		 String[] refTime= {"28-May-2014 07:00:00 PDT", "28-May-2014 07:00:00 PDT"};
 		 
@@ -400,8 +478,8 @@ public class GtfsRealtimeProviderImpl {
 				vehicleDescriptor.setId(vehicleIDs[t][v]);
  
 				//add the start_times filed
-				//startTime = _providerConfig.startTimeByTripIDMap.get(tripArr[i]);
-				//tripDescriptor.setStartTime(startTime);
+				startTime = _providerConfig.startTimeByTripIDMap.get(tripArr[t]);
+				tripDescriptor.setStartTime(startTime);
 			
 				TripUpdate.Builder tripUpdate = TripUpdate.newBuilder();
 				tripUpdate.setTrip(tripDescriptor);
@@ -597,12 +675,22 @@ public class GtfsRealtimeProviderImpl {
 			}
 		}
 	}
-
+ 
+	private String convert2FormattedTime(String myTimeStamp){
+		
+		// Format for input
+		   DateTimeFormatter dtf = DateTimeFormat.forPattern("yyyy-MM-dd'T'HH:mm:ssZ");
+		// Parsing the date
+		   DateTime jodatime = dtf.parseDateTime(myTimeStamp);
+		   DateTimeFormatter dtfOut = DateTimeFormat.forPattern("HH:mm:ss"); 
+		   return dtfOut.print(jodatime);
+	   }
+   
 	// This method extract time from timestamp
 	private long convertTime(String myTimeStamp) {
 
 		//final SimpleDateFormat sdf = new SimpleDateFormat( "yyyy-MM-dd'T'HH:mm:ssXXX");
-		DateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ"){ 
+		DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ"){ 
 		    public Date parse(String source,ParsePosition pos) {    
 		        return super.parse(source.replaceFirst(":(?=[0-9]{2}$)",""),pos);
 		    }
@@ -610,8 +698,14 @@ public class GtfsRealtimeProviderImpl {
 		Date time;// = new Date();
 		long result = 0;
 		try {
-			time = sdf.parse(myTimeStamp);
-			result = time.getTime();
+			//dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
+			//dateFormat.setTimeZone(dateFormat.getTimeZone());
+			time = dateFormat.parse(myTimeStamp);
+			result = time.getTime()/1000; 
+//			long hour = (long) (result/60/60);
+//			long min = (long) ((result%3600)/60);
+//			long sec = (long) ((result%3600)%60)/60;
+//			System.out.println("new time = "+ hour+" : "+min);
 
 		} catch (ParseException e) {
 			// TODO Auto-generated catch block
@@ -701,5 +795,14 @@ public class GtfsRealtimeProviderImpl {
 		            return -1;
 		}
 	}
-
+    
+	private class StartTimes{
+		public String currentStartT;
+		public String previousStartT;
+		//constructor
+		public StartTimes(String currentStartT, String previousStartT){
+			this.currentStartT = currentStartT;
+			this.previousStartT = previousStartT;
+		}
+	}
 }
