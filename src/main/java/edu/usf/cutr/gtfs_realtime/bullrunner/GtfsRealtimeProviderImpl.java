@@ -102,11 +102,12 @@ public class GtfsRealtimeProviderImpl {
 	private URL _url;
 	private BiHashMap<String, String, Float> routeVehiDirMap;
 	private BiHashMap<String, String, vehicleInfo> tripVehicleInfoMap;
+	private BiHashMap<String, String, StartTimes> routeVehicleStartTimeMap;
 	
 	/**
 	 * How often vehicle data will be downloaded, in seconds.
 	 */
-	private int _refreshInterval = 15;
+	private int _refreshInterval = 5;
 	private BullRunnerConfigExtract _providerConfig;
 
 	@Inject
@@ -144,7 +145,9 @@ public class GtfsRealtimeProviderImpl {
 
 	@PostConstruct
 	public void start() {
-
+		 
+		routeVehicleStartTimeMap = new BiHashMap<String, String, StartTimes>();
+		
 		try {
 			//_providerConfig .setUrl(new URL( "http://usfbullrunner.com/region/0/routes"));
 			_providerConfig.generatesRouteMap(new URL( "http://usfbullrunner.com/region/0/routes"));
@@ -182,13 +185,12 @@ public class GtfsRealtimeProviderImpl {
 	 * positions as a result.
 	 */
 	private void refreshTripVehicle() throws IOException, JSONException {
-
+		System.out.println("   &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
 		Pair pair = downloadVehicleDetails();
 		
 		JSONArray stopIDsArray = pair.getArray1();
 		JSONArray vehicleArray = pair.getArray2();
 		//BiHashMap<String, String, String> routeVehicleStartTimeMap = new BiHashMap<String, String, String>();
-		BiHashMap<String, String, StartTimes> routeVehicleStartTimeMap = new BiHashMap<String, String, StartTimes>();
 		
 		if (stopIDsArray.length() == 0) {
 			System.out.println("No updates available");
@@ -212,12 +214,13 @@ public class GtfsRealtimeProviderImpl {
 		 TripUpdate.Builder tripUpdate = null;
 		 TripDescriptor.Builder tripDescriptor = null;
 		 
-		 BiHashMap<String, String, TripUpdate.Builder> tripUpdateMap = new BiHashMap<String, String, TripUpdate.Builder>();
+		 
 		 List <TripUpdate.Builder> tripUpdateArr = new ArrayList();
 		 List <stopTimeUpdateRecord> records = new ArrayList<stopTimeUpdateRecord>();
 		 routeVehiDirMap = new BiHashMap<String, String, Float>();
 		 tripVehicleInfoMap = new BiHashMap<String, String, vehicleInfo>();
-		  
+		 BiHashMap<String, String, TripUpdate.Builder> tripUpdateMap =  new BiHashMap<String, String, TripUpdate.Builder>();
+			 
 		 for (int i = 0; i < stopIDsArray.length(); i ++) {
 				JSONObject obj = stopIDsArray.getJSONObject(i);
 				route = obj.getString("route").substring(6); 			
@@ -241,7 +244,6 @@ public class GtfsRealtimeProviderImpl {
 						vehicleDescriptor = VehicleDescriptor.newBuilder();
 						vehicleDescriptor.setId(vehicleId);
 						tripDescriptor = TripDescriptor.newBuilder();
-						//tripDescriptor.setScheduleRelationship(ScheduleRelationship.UNSCHEDULED);
 						//startTime = _providerConfig.startTimeByTripIDMap.get(trip);
 						
 						tripDescriptor.setRouteId(route);
@@ -252,7 +254,6 @@ public class GtfsRealtimeProviderImpl {
 						tripUpdateArr.add(tripUpdate);
 					}else{
 						tripUpdate = tripUpdateMap.get(route, vehicleId);		
-						//System.out.println("OLD entry = route "+ route+ ", vehicleID = "+ vehicleId);
 					}
 					
 					StopTimeEvent.Builder arrival = StopTimeEvent.newBuilder();
@@ -270,8 +271,8 @@ public class GtfsRealtimeProviderImpl {
 					 
 					if (stopSeq.equals("1")){
 						startTime = convert2FormattedTime(predTimeStamp);
-						//System.out.println("pre starttime = "+ tripUpdate.getTrip().getStartTime());
-						//update start time
+						System.out.println(" starttime = "+ startTime);
+						System.out.println("stopSeq =1,  route "+ route+ ", vehicleID = "+ vehicleId);
 						tripDescriptor.setStartTime(startTime);		
 						tripUpdate.setTrip(tripDescriptor);
 						 
@@ -279,6 +280,7 @@ public class GtfsRealtimeProviderImpl {
 							StartTimes startTimes= routeVehicleStartTimeMap.get(route, vehicleId);
 							startTimes.previousStartT = startTimes.currentStartT;
 							startTimes.currentStartT = startTime;
+							//System.out.println("0000 contanis: route, vehicleId = "+ route + " , "+ vehicleId);
 						} else{
 							StartTimes startTimesInstance = new StartTimes(startTime, "0");
 							System.out.println("route, vehicleId = "+ route + " , "+ vehicleId);
@@ -306,7 +308,7 @@ public class GtfsRealtimeProviderImpl {
 		 for (int j = 0; j < tripUpdateArr.size(); j++){
 			FeedEntity.Builder tripUpdateEntity = FeedEntity.newBuilder();
 			tripUpdate = tripUpdateArr.get(j);
-			System.out.println("-----size of trip Updates = " + tripUpdate.getStopTimeUpdateList().size());
+			//System.out.println("-----size of trip Updates = " + tripUpdate.getStopTimeUpdateList().size());
 			
 			int noStopTimes = tripUpdate.getStopTimeUpdateList().size();
 			route = tripUpdate.getTrip().getRouteId();
@@ -316,12 +318,11 @@ public class GtfsRealtimeProviderImpl {
 			
 			long preTime = 0;
 			for(int h= 0; h < noStopTimes; h++){
-				
 				long myTimeStamp = tripUpdate.getStopTimeUpdate(h).getArrival().getTime();
-				System.out.println("stopTime, h= "+ h+ ", seq = "+ tripUpdate.getStopTimeUpdate(h).getStopSequence() +" , "+ myTimeStamp);
+				//System.out.println("stopTime, h= "+ h+ ", seq = "+ tripUpdate.getStopTimeUpdate(h).getStopSequence() +" , "+ myTimeStamp);
 		
-				if ((tripUpdate.getStopTimeUpdate(h).getArrival().getTime() < preTime) && (0 <= tripUpdate.getStopTimeUpdate(h).getArrival().getTime())){
-					System.out.println("^^^^^^^^^should come here once: h= "+ h);
+				if (tripUpdate.getStopTimeUpdate(h).getArrival().getTime() < preTime){
+					System.out.println("--should come here once: h = "+ h);
 					List <StopTimeUpdate> allStopUpdates = tripUpdate.getStopTimeUpdateList();
 					tripUpdate.clearStopTimeUpdate();
 					TripUpdate.Builder newTripUpdate = tripUpdate.clone();
@@ -332,29 +333,36 @@ public class GtfsRealtimeProviderImpl {
 					tripUpdateEntity.setId(Integer.toString(entity));
 					tripUpdateEntity.setTripUpdate(newTripUpdate);
 					tripUpdates.addEntity(tripUpdateEntity);
-					System.out.println("what has been sent: size = "+ newTripUpdate.getStopTimeUpdateList().size()+ " stoptime");
+					//System.out.println("what has been sent: size = "+ newTripUpdate.getStopTimeUpdateList().size()+ " stoptime");
 					
 					tripUpdate.addAllStopTimeUpdate(allStopUpdates.subList(h, noStopTimes));
-					System.out.println("current tripUpdate size = "+ tripUpdate.getStopTimeUpdateList().size()+ " stoptime");
+					//System.out.println("current tripUpdate size = "+ tripUpdate.getStopTimeUpdateList().size()+ " stoptime");
 					preTime = 0;
 					noStopTimes = noStopTimes - h;
 					h = -1; 
-					
-					StartTimes startTimes= routeVehicleStartTimeMap.get(route, vehicleId);
-					
+					StartTimes startTimes;
+					if (routeVehicleStartTimeMap.containsKeys(route, vehicleId))
+						startTimes = routeVehicleStartTimeMap.get(route, vehicleId);
+					else{
+						startTimes = new StartTimes(startTime, "0");
+						//System.out.println("it seems that stop seq=1 is missing");
+						routeVehicleStartTimeMap.put(route, vehicleId, startTimes);
+					}
+					 
 					String previousStartT = startTimes.previousStartT;
+					
 					//TripDescriptor currentTrip = newTripUpdate.getTrip();
 					TripDescriptor.Builder newTripDescriptor = TripDescriptor.newBuilder();
 					newTripDescriptor.setTripId(trip);
 					newTripDescriptor.setRouteId(route);
 					newTripDescriptor.setStartTime(previousStartT);
 					tripUpdate.setTrip(newTripDescriptor);
-					System.out.println("old start time = "+ tripUpdate.getTrip().getStartTime()+ ", new startTime = "+ newTripUpdate.getTrip().getStartTime());
+					System.out.println("second startTime = "+ tripUpdate.getTrip().getStartTime()+ "  &&&& first startTime = "+ newTripUpdate.getTrip().getStartTime());
 				}
 				else
 					preTime = tripUpdate.getStopTimeUpdate(h).getArrival().getTime();
 			}
-			System.out.println("++++++++++++++++++++++++++++++++++++++++++++++");
+			System.out.println("....................................");
 			entity ++;
 			 
 			tripUpdateEntity.setId(Integer.toString(entity));
@@ -364,7 +372,7 @@ public class GtfsRealtimeProviderImpl {
 		 _gtfsRealtimeProvider.setTripUpdates(tripUpdates.build());
 		  
 			// _log.info("stoIDs extracted: " + tripUpdates.getEntityCount());
-			 System.out.println("stoIDs extracted: " + tripUpdates.getEntityCount());
+			// System.out.println("stoIDs extracted: " + tripUpdates.getEntityCount());
 			
 			 
 			 
