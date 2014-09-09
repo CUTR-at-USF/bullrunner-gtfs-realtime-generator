@@ -185,7 +185,7 @@ public class GtfsRealtimeProviderImpl {
 	 * positions as a result.
 	 */
 	private void refreshTripVehicle() throws IOException, JSONException {
-		System.out.println("   &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
+		//System.out.println("   &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
 		Pair pair = downloadVehicleDetails();
 		
 		JSONArray stopIDsArray = pair.getArray1();
@@ -270,9 +270,8 @@ public class GtfsRealtimeProviderImpl {
 					}
 					 
 					if (stopSeq.equals("1")){
-						startTime = convert2FormattedTime(predTimeStamp);
-						System.out.println(" starttime = "+ startTime);
-						System.out.println("stopSeq =1,  route "+ route+ ", vehicleID = "+ vehicleId);
+						startTime = convert2FormattedTime(predTimeStamp);						 
+						//System.out.println("stopSeq =1,  route "+ route+ ", vehicleID = "+ vehicleId);
 						tripDescriptor.setStartTime(startTime);		
 						tripUpdate.setTrip(tripDescriptor);
 						 
@@ -283,7 +282,7 @@ public class GtfsRealtimeProviderImpl {
 							//System.out.println("0000 contanis: route, vehicleId = "+ route + " , "+ vehicleId);
 						} else{
 							StartTimes startTimesInstance = new StartTimes(startTime, "0");
-							System.out.println("route, vehicleId = "+ route + " , "+ vehicleId);
+							//System.out.println("route, vehicleId = "+ route + " , "+ vehicleId);
 							routeVehicleStartTimeMap.put(route, vehicleId, startTimesInstance);
 						}
 						//System.out.println("current starttime = "+ tripUpdate.getTrip().getStartTime());
@@ -314,15 +313,34 @@ public class GtfsRealtimeProviderImpl {
 			route = tripUpdate.getTrip().getRouteId();
 			trip = tripUpdate.getTrip().getTripId();
 			String vehicleId = tripUpdate.getVehicle().getId();
-			System.out.println("route = "+ route+ ", vehicleId = "+ vehicleId);
+			//System.out.println("route = "+ route+ ", vehicleId = "+ vehicleId);
 			
+			if (tripUpdate.getStopTimeUpdate(0).getStopSequence() != 1){
+				StartTimes startTimes;
+				
+				//System.out.println("route = "+ route+ ", vehicleId = "+ vehicleId);
+				if (routeVehicleStartTimeMap.containsKeys(route, vehicleId)){
+					startTimes = routeVehicleStartTimeMap.get(route, vehicleId);
+				} else {
+					//cold start
+					startTimes = new StartTimes("0", "0");	 
+					routeVehicleStartTimeMap.put(route, vehicleId, startTimes);
+				}
+
+				TripDescriptor.Builder newTripDescriptor = TripDescriptor.newBuilder();
+				newTripDescriptor.setTripId(trip);
+				newTripDescriptor.setRouteId(route);
+				newTripDescriptor.setStartTime(startTimes.currentStartT);
+				tripUpdate.setTrip(newTripDescriptor);
+
+				}
 			long preTime = 0;
 			for(int h= 0; h < noStopTimes; h++){
 				long myTimeStamp = tripUpdate.getStopTimeUpdate(h).getArrival().getTime();
 				//System.out.println("stopTime, h= "+ h+ ", seq = "+ tripUpdate.getStopTimeUpdate(h).getStopSequence() +" , "+ myTimeStamp);
 		
 				if (tripUpdate.getStopTimeUpdate(h).getArrival().getTime() < preTime){
-					System.out.println("--should come here once: h = "+ h);
+					//System.out.println("--should come here once: h = "+ h);
 					List <StopTimeUpdate> allStopUpdates = tripUpdate.getStopTimeUpdateList();
 					tripUpdate.clearStopTimeUpdate();
 					TripUpdate.Builder newTripUpdate = tripUpdate.clone();
@@ -357,12 +375,12 @@ public class GtfsRealtimeProviderImpl {
 					newTripDescriptor.setRouteId(route);
 					newTripDescriptor.setStartTime(previousStartT);
 					tripUpdate.setTrip(newTripDescriptor);
-					System.out.println("second startTime = "+ tripUpdate.getTrip().getStartTime()+ "  &&&& first startTime = "+ newTripUpdate.getTrip().getStartTime());
+					//System.out.println("second startTime = "+ tripUpdate.getTrip().getStartTime()+ "  &&&& first startTime = "+ newTripUpdate.getTrip().getStartTime());
 				}
 				else
 					preTime = tripUpdate.getStopTimeUpdate(h).getArrival().getTime();
 			}
-			System.out.println("....................................");
+			//System.out.println("....................................");
 			entity ++;
 			 
 			tripUpdateEntity.setId(Integer.toString(entity));
