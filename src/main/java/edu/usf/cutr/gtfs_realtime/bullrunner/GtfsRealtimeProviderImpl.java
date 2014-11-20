@@ -20,9 +20,9 @@ import java.util.List;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.StringReader;
+import java.io.Reader;
 import java.net.URL;
-import java.security.Timestamp;
+import java.net.URLConnection;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -30,11 +30,6 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
-import java.util.GregorianCalendar;
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.TimeZone;
-import java.util.Vector;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -52,6 +47,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
+import org.omg.CORBA.portable.InputStream;
 import org.onebusway.gtfs_realtime.exporter.GtfsRealtimeExporterModule;
 import org.onebusway.gtfs_realtime.exporter.GtfsRealtimeLibrary;
 import org.onebusway.gtfs_realtime.exporter.GtfsRealtimeMutableProvider;
@@ -186,7 +182,6 @@ public class GtfsRealtimeProviderImpl {
 	private void refreshTripVehicle() throws IOException, JSONException {
 		 
 		Pair pair = downloadVehicleDetails();
-//		_log.info("trip and vehicle info have been extracted.");
 		JSONArray stopIDsArray = pair.getArray1();
 		JSONArray vehicleArray = pair.getArray2();
 		 
@@ -212,7 +207,7 @@ public class GtfsRealtimeProviderImpl {
 		 TripDescriptor.Builder tripDescriptor = null;
 		 
 		 
-		 List <TripUpdate.Builder> tripUpdateArr = new ArrayList();
+		 List <TripUpdate.Builder> tripUpdateArr = new ArrayList<>();
 		 List <stopTimeUpdateRecord> records = new ArrayList<stopTimeUpdateRecord>();
 		 routeVehiDirMap = new BiHashMap<String, String, Float>();
 		 tripVehicleInfoMap = new BiHashMap<String, String, vehicleInfo>();
@@ -276,7 +271,6 @@ public class GtfsRealtimeProviderImpl {
 							startTimes.currentStartT = startTime;
 						} else{
 							StartTimes startTInstance = new StartTimes(startTime, "0");
-							//System.out.println("route, vehicleId = "+ route + " , "+ vehicleId);
 							routeVehicleStartTimeMap.put(route, vehicleId, startTInstance);
 						}
 						//System.out.println("current starttime = "+ tripUpdate.getTrip().getStartTime());
@@ -307,12 +301,9 @@ public class GtfsRealtimeProviderImpl {
 			route = tripUpdate.getTrip().getRouteId();
 			trip = tripUpdate.getTrip().getTripId();
 			String vehicleId = tripUpdate.getVehicle().getId();
-			//System.out.println("route = "+ route+ ", vehicleId = "+ vehicleId);
-			
+			 
 			if (tripUpdate.getStopTimeUpdate(0).getStopSequence() != 1){
 				StartTimes startTInstance;
-				
-				//System.out.println("route = "+ route+ ", vehicleId = "+ vehicleId);
 				if (routeVehicleStartTimeMap.containsKeys(route, vehicleId)){
 					startTInstance = routeVehicleStartTimeMap.get(route, vehicleId);
 				} else {
@@ -486,28 +477,44 @@ public class GtfsRealtimeProviderImpl {
 	}
 
 	private Pair downloadVehicleDetails() throws IOException, JSONException {
-		BufferedReader reader = null;
-		try{
-			reader = new BufferedReader(new InputStreamReader(
-				_url.openStream()));
-		} catch (Exception ex) {
-			_log.error("Error in opening feeds url", ex);
-		}
-		StringBuilder builder = new StringBuilder();
-		String inputLine;
-		while ((inputLine = reader.readLine()) != null)
-			builder.append(inputLine).append("\n");
+		URLConnection connection = null;
+		try {
+		    connection = _url.openConnection();
+		  } catch (Exception ex) {
+		    _log.error("Error in opening feeds url", ex);
+		  }
+		  
+		  connection.setConnectTimeout(10000);  // connectTimeout is time out in miliseconds
+		  connection.setReadTimeout(10000);
+		  java.io.InputStream in =  connection.getInputStream();
 
-		JSONObject object = (JSONObject) new JSONTokener(builder.toString())
-				.nextValue();
- 
-		String data = object.getString("PredictionData");
-		JSONObject child2_obj = new JSONObject(data);
-		responseTimeStamp = child2_obj.getString("TimeStamp");
-		JSONArray stopIDsArray = child2_obj.getJSONArray("StopPredictions");
-		JSONArray vehicleArray = child2_obj.getJSONArray("VehicleLocationData");
+		  BufferedReader reader = new BufferedReader(new InputStreamReader(in, "UTF-8"));
 
-		return new Pair(stopIDsArray, vehicleArray);
+		  StringBuilder builder = new StringBuilder();
+		  String inputLine;
+		  JSONArray stopIDsArray;
+		  JSONArray vehicleArray;
+		  try {
+		    while ((inputLine = reader.readLine()) != null)
+		      builder.append(inputLine).append("\n");
+
+		    JSONObject object = (JSONObject) new JSONTokener(builder.toString())
+		            .nextValue();
+
+		    String data = object.getString("PredictionData");
+		    JSONObject child2_obj = new JSONObject(data);
+		    responseTimeStamp = child2_obj.getString("TimeStamp");
+		     stopIDsArray = child2_obj.getJSONArray("StopPredictions");
+		     vehicleArray = child2_obj.getJSONArray("VehicleLocationData");
+
+		  } catch (java.net.SocketTimeoutException ex) {
+			  _log.error("Error readline, server dosn't close the connection.", ex);
+		    stopIDsArray = null;
+		    vehicleArray = null;
+		  }
+		  return new Pair(stopIDsArray, vehicleArray);
+
+	 
 	}
 
 	/**
@@ -559,11 +566,6 @@ public class GtfsRealtimeProviderImpl {
 			//dateFormat.setTimeZone(dateFormat.getTimeZone());
 			time = dateFormat.parse(myTimeStamp);
 			result = time.getTime()/1000; 
-//			long hour = (long) (result/60/60);
-//			long min = (long) ((result%3600)/60);
-//			long sec = (long) ((result%3600)%60)/60;
-//			System.out.println("new time = "+ hour+" : "+min);
-
 		} catch (ParseException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -610,7 +612,6 @@ public class GtfsRealtimeProviderImpl {
 		
 		String urlStr = ""+ "http://usfbullrunner.com/route/"+ routeID+"/vehicles";
 		JSONArray jsonVehicle = _providerConfig.downloadCofiguration(new URL( urlStr ));
-		//System.out.println("routeID = "+ routeID+ " "+ route+  ", url: "+ urlStr+ ", "+ jsonVehicle.length());
 		
 		for (int i= 0; i < jsonVehicle.length(); i++ ){
 			

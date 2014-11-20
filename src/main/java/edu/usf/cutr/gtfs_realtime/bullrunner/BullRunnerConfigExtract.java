@@ -1,13 +1,10 @@
 package edu.usf.cutr.gtfs_realtime.bullrunner;
 
-import java.awt.List;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.HashMap;
 
 import org.json.JSONArray;
@@ -71,7 +68,6 @@ public class BullRunnerConfigExtract {
              */
 			int ID = obj.getInt("ID");
 			String route = obj.getString("DisplayName").substring(0, 1);
-			//System.out.println("ID , route; "+ ID+ " , "+ route);
 			routesMap.put(route, ID);
 		}
 	}
@@ -192,8 +188,7 @@ public class BullRunnerConfigExtract {
 				 tokens = line.split(delims);
 		 	     trip_id = tokens[0];
 		 	     start_time = tokens[1];
-		 	    startTimeByTripIDMap.put(trip_id, start_time);
-		 	   //System.out.println("tripID = "+ trip_id+ ", startTime = "+ start_time);
+		 	    startTimeByTripIDMap.put(trip_id, start_time); 
 		 	  line = frequencies.readLine();
 			 }
 		}finally{
