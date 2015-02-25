@@ -18,7 +18,7 @@ package edu.usf.cutr.gtfs_realtime.bullrunner;
 import java.util.Set;
 
 import org.onebusaway.guice.jsr250.JSR250Module;
-import org.onebusway.gtfs_realtime.exporter.GtfsRealtimeExporterModule;
+import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeExporterModule;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Module;

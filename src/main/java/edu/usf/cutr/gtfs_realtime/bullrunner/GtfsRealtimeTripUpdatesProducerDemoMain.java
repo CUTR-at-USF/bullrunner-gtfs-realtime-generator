@@ -21,21 +21,24 @@ import java.net.URL;
 import java.util.HashSet;
 import java.util.Set;
 
-import javax.inject.Inject;
-
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.Parser;
 import org.json.JSONException;
 import org.onebusaway.cli.CommandLineInterfaceLibrary;
+import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeFileWriter;
+import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeServlet;
+import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeSource;
+
+import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeGuiceBindingTypes;
+import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeGuiceBindingTypes.VehiclePositions;
+import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeGuiceBindingTypes.TripUpdates;
+import org.onebusaway.guice.jsr250.JSR250Module;
 import org.onebusaway.guice.jsr250.LifecycleService;
-import org.onebusway.gtfs_realtime.exporter.TripUpdatesFileWriter;
-import org.onebusway.gtfs_realtime.exporter.TripUpdatesServlet;
-import org.onebusway.gtfs_realtime.exporter.VehiclePositionsFileWriter;
-import org.onebusway.gtfs_realtime.exporter.VehiclePositionsServlet;
 
 import com.google.inject.Guice;
+import com.google.inject.Inject;
 import com.google.inject.Injector;
 import com.google.inject.Module;
 
@@ -61,6 +64,33 @@ public class GtfsRealtimeTripUpdatesProducerDemoMain {
 //	public void setProvider(BullRunnerConfigExtract providerConfig) {
 //		_providerConfig = providerConfig;
 //	}
+
+	private GtfsRealtimeSource _tripUpdates;
+ 	private GtfsRealtimeSource _vehiclePositions;
+
+/*
+	@Inject
+	public void setVehiclePositionsProducer(VehiclePositionsProducer producer) {
+	    // This is just here to make sure VehiclePositionsProducer gets instantiated.
+	}
+*/
+  
+	@Inject
+	public void setVehiclePositionsSource(@VehiclePositions GtfsRealtimeSource vehiclePositionsSource) {
+	    _vehiclePositions = vehiclePositionsSource;
+   	}
+ 
+/* 
+        @Inject
+        public void setTripUpdatesProducer(TripUpdatesProducer producer) {
+            // This is just here to make sure TripUpdatesProducer gets instantiated.
+        }
+*/
+
+        @Inject
+        public void setTripUpdatesSource(@TripUpdates GtfsRealtimeSource tripUpdatesSource) {
+            _tripUpdates = tripUpdatesSource;
+        }
 
 	@Inject
 	public void setProvider(GtfsRealtimeProviderImpl provider) {
@@ -98,31 +128,32 @@ public class GtfsRealtimeTripUpdatesProducerDemoMain {
 		//only for test, creat a static json for 8:32pm, August 5th, 2014
 	    //_provider.setUrl(new URL( "http://myweb.usf.edu/~mona2/syncromticOffLine_8_32August5.json"));
 			
+
 		if (cli.hasOption(ARG_TRIP_UPDATES_URL)) {
 			URL url = new URL(cli.getOptionValue(ARG_TRIP_UPDATES_URL));
-			TripUpdatesServlet servlet = injector
-					.getInstance(TripUpdatesServlet.class);
+			GtfsRealtimeServlet servlet = injector.getInstance(GtfsRealtimeServlet.class);
+			servlet.setSource(_tripUpdates);
 			servlet.setUrl(url);
 		}
 		if (cli.hasOption(ARG_TRIP_UPDATES_PATH)) {
 			File path = new File(cli.getOptionValue(ARG_TRIP_UPDATES_PATH));
 
-			TripUpdatesFileWriter writer = injector
-					.getInstance(TripUpdatesFileWriter.class);
+			GtfsRealtimeFileWriter writer = injector.getInstance(GtfsRealtimeFileWriter.class);
+			writer.setSource(_tripUpdates);
 			writer.setPath(path);
 		}
 
 		if (cli.hasOption(ARG_VEHICLE_POSITIONS_URL)) {
 			URL url = new URL(cli.getOptionValue(ARG_VEHICLE_POSITIONS_URL));
 
-			VehiclePositionsServlet servlet = injector
-					.getInstance(VehiclePositionsServlet.class);
+			GtfsRealtimeServlet servlet = injector.getInstance(GtfsRealtimeServlet.class);
+			servlet.setSource(_vehiclePositions);
 			servlet.setUrl(url);
 		}
 		if (cli.hasOption(ARG_VEHICLE_POSITIONS_PATH)) {
 			File path = new File(cli.getOptionValue(ARG_VEHICLE_POSITIONS_PATH));
-			VehiclePositionsFileWriter writer = injector
-					.getInstance(VehiclePositionsFileWriter.class);
+		 	GtfsRealtimeFileWriter writer = injector.getInstance(GtfsRealtimeFileWriter.class);
+			writer.setSource(_vehiclePositions);
 			writer.setPath(path);
 		}
 
