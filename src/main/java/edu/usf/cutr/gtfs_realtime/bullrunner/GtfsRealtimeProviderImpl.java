@@ -37,7 +37,6 @@ import java.text.ParsePosition;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
-import javax.inject.Inject;
 import javax.inject.Singleton;
 
 import org.joda.time.DateTime;
@@ -48,10 +47,16 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 import org.omg.CORBA.portable.InputStream;
-import org.onebusway.gtfs_realtime.exporter.GtfsRealtimeExporterModule;
-import org.onebusway.gtfs_realtime.exporter.GtfsRealtimeLibrary;
-import org.onebusway.gtfs_realtime.exporter.GtfsRealtimeMutableProvider;
-import org.onebusway.gtfs_realtime.exporter.GtfsRealtimeProvider;
+import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeExporterModule;
+import edu.usf.cutr.gtfs_realtime.bullrunner.GtfsRealtimeExporterCutr;
+import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeLibrary;
+import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeSink;
+import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeFullUpdate;
+import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeGuiceBindingTypes;
+import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeGuiceBindingTypes.VehiclePositions;
+import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeGuiceBindingTypes.TripUpdates;
+import org.onebusaway.guice.jsr250.JSR250Module;
+import org.onebusaway.guice.jsr250.LifecycleService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,10 +70,12 @@ import com.google.transit.realtime.GtfsRealtime.TripUpdate.StopTimeEvent;
 import com.google.transit.realtime.GtfsRealtime.TripUpdate.StopTimeUpdate;
 import com.google.transit.realtime.GtfsRealtime.VehicleDescriptor;
 import com.google.transit.realtime.GtfsRealtime.VehiclePosition;
+import com.google.transit.realtime.GtfsRealtime.VehiclePosition.OccupancyStatus;
 
 import java.net.URL;
 
 import com.google.inject.Guice;
+import com.google.inject.Inject;
 import com.google.inject.Injector;
 import com.google.inject.Module;
 
@@ -93,7 +100,7 @@ public class GtfsRealtimeProviderImpl {
 	private String responseTimeStamp;
 	private ScheduledExecutorService _executor;
 
-	private GtfsRealtimeMutableProvider _gtfsRealtimeProvider;
+	private GtfsRealtimeExporterCutr _gtfsRealtimeProvider;
 	private URL _url;
 	private BiHashMap<String, String, Float> routeVehiDirMap;
 	private BiHashMap<String, String, vehicleInfo> tripVehicleInfoMap;
@@ -107,7 +114,7 @@ public class GtfsRealtimeProviderImpl {
 
 	@Inject
 	public void setGtfsRealtimeProvider(
-			GtfsRealtimeMutableProvider gtfsRealtimeProvider) {
+			GtfsRealtimeExporterCutr gtfsRealtimeProvider) {
 		_gtfsRealtimeProvider = gtfsRealtimeProvider;
 	}
 
@@ -138,9 +145,24 @@ public class GtfsRealtimeProviderImpl {
 		_providerConfig = providerConfig;
 	}
 
+
+        private GtfsRealtimeSink _vehiclePositionsSink;
+	private GtfsRealtimeSink _tripUpdatesSink;
+
+        @Inject
+        public void setVehiclePositionsSink(@VehiclePositions GtfsRealtimeSink vehiclePositionsSink) {
+  	     _vehiclePositionsSink = vehiclePositionsSink;
+	}
+
+        @Inject
+        public void setTripUpdatesSink(@TripUpdates GtfsRealtimeSink tripUpdatesSink) {
+             _tripUpdatesSink = tripUpdatesSink;
+        }
+
+  
 	@PostConstruct
 	public void start() {
-		 
+		
 		routeVehicleStartTimeMap = new BiHashMap<String, String, StartTimes>();
 		
 		try {
@@ -192,9 +214,9 @@ public class GtfsRealtimeProviderImpl {
 		int dayOfWeek = cal.get(Calendar.DAY_OF_WEEK) -1;
 		String serviceID = _providerConfig.serviceIds[dayOfWeek];
  
-		FeedMessage.Builder tripUpdates = GtfsRealtimeLibrary.createFeedMessageBuilder();
-		
-		FeedMessage.Builder vehiclePositions = GtfsRealtimeLibrary.createFeedMessageBuilder();
+		GtfsRealtimeFullUpdate tripUpdates = new GtfsRealtimeFullUpdate();		
+  		GtfsRealtimeFullUpdate vehiclePositions = new GtfsRealtimeFullUpdate();
+
 		 VehicleDescriptor.Builder vehicleDescriptor = null;
 		 String route, trip;
 		 int entity = 0;
@@ -352,7 +374,7 @@ public class GtfsRealtimeProviderImpl {
 						entity ++; 
 						tripUpdateEntity.setId(Integer.toString(entity));
 						tripUpdateEntity.setTripUpdate(newTripUpdate);
-						tripUpdates.addEntity(tripUpdateEntity);
+						tripUpdates.addEntity(tripUpdateEntity.build());
 						//System.out.println("what has been sent: size = "+ newTripUpdate.getStopTimeUpdateList().size()+ " stoptime");
 						
 						tripUpdate.addAllStopTimeUpdate(allStopUpdates.subList(h, noStopTimes));
@@ -386,11 +408,11 @@ public class GtfsRealtimeProviderImpl {
 			 
 			tripUpdateEntity.setId(Integer.toString(entity));
 			tripUpdateEntity.setTripUpdate(tripUpdate);
-			tripUpdates.addEntity(tripUpdateEntity);
+			tripUpdates.addEntity(tripUpdateEntity.build());
 		 }
-		 _gtfsRealtimeProvider.setTripUpdates(tripUpdates.build());
+		 _tripUpdatesSink.handleFullUpdate(tripUpdates);
 		  
-			 _log.info("stoIDs extracted: " + tripUpdates.getEntityCount());
+			 _log.info("stoIDs extracted: " + tripUpdates.getEntities().size());
 			// System.out.println("stoIDs extracted: " + tripUpdates.getEntityCount());
 			
 			 
@@ -422,8 +444,9 @@ public class GtfsRealtimeProviderImpl {
 						String vehicleId = child.getString("VehicleId");	
 						if (!routeVehiDirMap.containsKey(route))						
 							extractHeading(route);
+
 						vehicleInfo info = tripVehicleInfoMap.get(route, vehicleId);
-						 
+						
 						//_log.info("vehicles' info: " + info); 
 						bearing = info.bearing;
 						
@@ -434,6 +457,14 @@ public class GtfsRealtimeProviderImpl {
 						VehiclePosition.Builder vehiclePosition = VehiclePosition.newBuilder();
 						vehiclePosition.setPosition(position);
 						vehiclePosition.setTrip(tripDescriptor);
+
+						if (info.APCPercentage <= 0) vehiclePosition.setOccupancyStatus( VehiclePosition.OccupancyStatus.EMPTY );
+						else if (info.APCPercentage >= 95) vehiclePosition.setOccupancyStatus( VehiclePosition.OccupancyStatus.FULL );
+						else if (info.APCPercentage <= 50) vehiclePosition.setOccupancyStatus( VehiclePosition.OccupancyStatus.MANY_SEATS_AVAILABLE );
+						else if (info.APCPercentage <= 70) vehiclePosition.setOccupancyStatus( VehiclePosition.OccupancyStatus.FEW_SEATS_AVAILABLE );
+						else if (info.APCPercentage <= 90) vehiclePosition.setOccupancyStatus( VehiclePosition.OccupancyStatus.STANDING_ROOM_ONLY );
+						else vehiclePosition.setOccupancyStatus( VehiclePosition.OccupancyStatus.CRUSHED_STANDING_ROOM_ONLY );
+
 						vehicleDescriptor = VehicleDescriptor.newBuilder();
 						vehicleDescriptor.setId(vehicleId);
 						
@@ -443,12 +474,12 @@ public class GtfsRealtimeProviderImpl {
 						vehiclePosition.setVehicle(vehicleDescriptor);
 						vehiclePositionEntity.setVehicle(vehiclePosition);
 						
-						vehiclePositions.addEntity(vehiclePositionEntity);
+						vehiclePositions.addEntity(vehiclePositionEntity.build());
 						
 					}
 		 		}
-			 _gtfsRealtimeProvider.setVehiclePositions(vehiclePositions.build());
-			 _log.info("vehicles' location extracted: " + vehiclePositions.getEntityCount());	
+			 _vehiclePositionsSink.handleFullUpdate(vehiclePositions);
+			 _log.info("vehicles' location extracted: " + vehiclePositions.getEntities().size());	
 			 //System.out.println("vehicles' location extracted: " + vehiclePositions.getEntityCount());
 	}
  
@@ -606,10 +637,11 @@ public class GtfsRealtimeProviderImpl {
 	    public float lat;
 	    public float longi;
 	    public float bearing;
+	    public int APCPercentage;
 	}
 	private void extractHeading (String route) throws IOException, JSONException{
 		int routeID = _providerConfig.routesMap.get(route);	
-		
+	
 		String urlStr = ""+ "http://usfbullrunner.com/route/"+ routeID+"/vehicles";
 		JSONArray jsonVehicle = _providerConfig.downloadCofiguration(new URL( urlStr ));
 		
@@ -626,6 +658,8 @@ public class GtfsRealtimeProviderImpl {
 			info.lat = (float) coordinate.getDouble("Latitude");
 			info.longi = (float) coordinate.getDouble("Longitude");
 			info.bearing = direction;
+
+			info.APCPercentage = child.getInt("APCPercentage");
 			 
 			tripVehicleInfoMap.put(route, vehicleID, info);		 
 		}
