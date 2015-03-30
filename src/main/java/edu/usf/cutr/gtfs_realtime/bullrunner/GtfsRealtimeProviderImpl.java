@@ -281,6 +281,8 @@ public class GtfsRealtimeProviderImpl {
 					}
 					 
 					if (stopSeq.equals("1")){
+						// According to the spec, the start time for RT trips
+						// should be the time at which the first prediction for this trip instance was discovered
 						startTime = convert2FormattedTime(predTimeStamp);						 
 						//System.out.println("stopSeq =1,  route "+ route+ ", vehicleID = "+ vehicleId);
 						tripDescriptor.setStartTime(startTime);	
@@ -288,9 +290,25 @@ public class GtfsRealtimeProviderImpl {
 						tripUpdate.setTrip(tripDescriptor);
 						 
 						if (routeVehicleStartTimeMap.containsKeys(route, vehicleId)){
+
 							StartTimes startTimes= routeVehicleStartTimeMap.get(route, vehicleId);
-							startTimes.previousStartT = startTimes.currentStartT;
-							startTimes.currentStartT = startTime;
+						
+							// Only update current/previous if the new prediction is different...otherwise we needlessly lost the state of the first instance
+							// ... ALSO check if distance/delay is at least the length of an actual loop before updating again
+							// maybe wait until the current time is > seq 1 prediction (the bus is @ or beyond stop)
+							if (startTime != startTimes.currentStartT) {
+
+								//System.out.println(String.format(" - Start time updated for CURRENT instance (old %s) for route=%s veh=%s time=%s", startTimes.currentStartT, route, vehicleId, startTime) );
+
+								// Only move current instance to previous one time when the new #1 prediction is a sufficient distance from the current instance start time i.e: enough time for the bus to make one loop - about 10 mins
+								// XXX extrapolate stop# from vehicle location and only create new instance when bus is 'confirmed' to have passed stop #1
+								if (timeDifference( startTime, startTimes.currentStartT ) > 60*10) {
+									System.out.println(String.format(" - Start time updated for PREVIOUS instance (%s to %s) for route=%s veh=%s time=%s", startTimes.previousStartT, startTimes.currentStartT, route, vehicleId, startTime));
+									startTimes.previousStartT = startTimes.currentStartT;
+								}
+
+								startTimes.currentStartT = startTime;
+							}
 						} else{
 							StartTimes startTInstance = new StartTimes(startTime, "0");
 							routeVehicleStartTimeMap.put(route, vehicleId, startTInstance);
@@ -341,7 +359,7 @@ public class GtfsRealtimeProviderImpl {
 				newTripDescriptor.setScheduleRelationship(ScheduleRelationship.UNSCHEDULED);
 				tripUpdate.setTrip(newTripDescriptor);
 
-				}
+			}
 //			System.out.println("responseTimeStamp: "+ responseTimeStamp + "change it to unix: "+ responseTimeStamp); 
 			int delay;
 			long preTime = 0;
@@ -580,7 +598,25 @@ public class GtfsRealtimeProviderImpl {
 		   DateTimeFormatter dtfOut = DateTimeFormat.forPattern("HH:mm:ss"); 
 		   return dtfOut.print(jodatime);
 	   }
-   
+ 
+	// http://stackoverflow.com/questions/4927856/how-to-calculate-time-difference-in-java 
+	// Returns seconds
+	private long timeDifference(String time1, String time2)
+	{
+		SimpleDateFormat format = new SimpleDateFormat("HH:mm:ss");
+		Date d1, d2;
+		long diff = 0;
+		try {
+			d1 = format.parse(time1);
+			d2 = format.parse(time2);
+			diff = (d2.getTime() - d1.getTime())/1000;
+		}
+		catch (ParseException e) {
+			return 0; // XXX
+		}
+		return Math.abs(diff);
+	}
+ 
 	// This method extract time from timestamp
 	private long convertTime(String myTimeStamp) {
 
