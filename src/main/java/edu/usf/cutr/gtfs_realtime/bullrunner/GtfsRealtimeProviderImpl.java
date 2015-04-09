@@ -228,12 +228,22 @@ public class GtfsRealtimeProviderImpl {
 		 TripUpdate.Builder tripUpdate = null;
 		 TripDescriptor.Builder tripDescriptor = null;
 		 
-		 
 		 List <TripUpdate.Builder> tripUpdateArr = new ArrayList<>();
 		 List <stopTimeUpdateRecord> records = new ArrayList<stopTimeUpdateRecord>();
 		 routeVehiDirMap = new BiHashMap<String, String, Float>();
 		 tripVehicleInfoMap = new BiHashMap<String, String, vehicleInfo>();
 		 BiHashMap<String, String, TripUpdate.Builder> tripUpdateMap =  new BiHashMap<String, String, TripUpdate.Builder>();
+
+/*
+tripUpdates (upstream container)
+
+tripUpdateArr (tripupdate.builder)
+records (stoptimeupdaterecord)
+tripUpdateMap (route, vehicle, tripupdate.builder)
+
+- iterate all stop predictions (includes times per route, vehicle)
+
+*/
 			 
 		 for (int i = 0; i < stopIDsArray.length(); i ++) {
 				JSONObject obj = stopIDsArray.getJSONObject(i);
@@ -279,7 +289,9 @@ public class GtfsRealtimeProviderImpl {
 						_log.warn("Error stopID: "+ stopId+ " is not available in GTFS files");
 						System.out.println("Error: stopID: "+ stopId+ " is not available in GTFS files");
 					}
-					 
+					
+					// XXX order predictions for route by time, and if seq# is non-increasing, split the trip
+ 
 					if (stopSeq.equals("1")){
 						// According to the spec, the start time for RT trips
 						// should be the time at which the first prediction for this trip instance was discovered
@@ -305,9 +317,11 @@ public class GtfsRealtimeProviderImpl {
 								if (timeDifference( startTime, startTimes.currentStartT ) > 60*10) {
 									System.out.println(String.format(" - Start time updated for PREVIOUS instance (%s to %s) for route=%s veh=%s time=%s", startTimes.previousStartT, startTimes.currentStartT, route, vehicleId, startTime));
 									startTimes.previousStartT = startTimes.currentStartT;
+		
+									// ONLY update current time ONCE so that it can be a unique identifier
+									startTimes.currentStartT = startTime;
 								}
 
-								startTimes.currentStartT = startTime;
 							}
 						} else{
 							StartTimes startTInstance = new StartTimes(startTime, "0");
