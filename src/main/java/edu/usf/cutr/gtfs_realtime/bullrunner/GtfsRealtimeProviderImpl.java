@@ -453,7 +453,7 @@ tripUpdateMap (route, vehicle, tripupdate.builder)
 			 for (int k = 0; k < vehicleArray.length(); k++) {
 					JSONObject vehicleObj = vehicleArray.getJSONObject(k);
 
-					// We only operate on "Route A" routes and ignore everything else
+					// We only operate on "Route X" routes and ignore other strings
 					if (vehicleObj.getString("route").length() != 7) continue; 
 
 					route = vehicleObj.getString("route").substring(6);		 			
