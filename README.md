@@ -1,4 +1,4 @@
-bullrunner-gtfs-realtime-generator
+bullrunner-gtfs-realtime-generator [![Build Status](https://travis-ci.org/CUTR-at-USF/bullrunner-gtfs-realtime-generator.svg?branch=master)](https://travis-ci.org/CUTR-at-USF/bullrunner-gtfs-realtime-generator)
 ==================================
 
 Desktop application that retrieves AVL data from the USF Bull Runner's AVL system and produces Trip Updates and Vehicle Positions files in GTFS-realtime format.
