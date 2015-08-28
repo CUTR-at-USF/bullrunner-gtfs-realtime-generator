@@ -452,6 +452,10 @@ tripUpdateMap (route, vehicle, tripupdate.builder)
 			 float bearing;
 			 for (int k = 0; k < vehicleArray.length(); k++) {
 					JSONObject vehicleObj = vehicleArray.getJSONObject(k);
+
+					// We only operate on "Route X" routes and ignore other strings
+					if (vehicleObj.getString("route").length() != 7) continue; 
+
 					route = vehicleObj.getString("route").substring(6);		 			
 					JSONArray vehicleLocsArray = vehicleObj .getJSONArray("VehicleLocation");
 					
