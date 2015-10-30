@@ -239,7 +239,7 @@ public class GtfsRealtimeProviderImpl {
 				JSONObject obj = stopIDsArray.getJSONObject(i);
 				route = obj.getString("route").substring(6); 			
 				trip = _providerConfig.tripIDMap.get(route, serviceID);	
-				if (trip.equals("") || trip == null)
+				if (trip == null || trip.equals(""))
 					_log.error("Route "+ route+ "dosn't exit in GTFS file");
 				int stopId_int = obj.getInt("stop");
 				stopId = Integer.toString(stopId_int);
