@@ -167,7 +167,7 @@ public class GtfsRealtimeProviderImpl {
 		
 		try {
 			//_providerConfig .setUrl(new URL( "http://usfbullrunner.com/region/0/routes"));
-			_providerConfig.generatesRouteMap(new URL( "http://usfbullrunner.com/region/0/routes"));
+			_providerConfig.generatesRouteMap(new URL( "https://usfbullrunner.com/region/0/routes"));
 			_providerConfig.generateTripMap();
 			_providerConfig.generateServiceMap();
 			_providerConfig.extractSeqId();
@@ -646,7 +646,7 @@ public class GtfsRealtimeProviderImpl {
 	private void extractHeading (String route) throws IOException, JSONException{
 		int routeID = _providerConfig.routesMap.get(route);	
 	
-		String urlStr = ""+ "http://usfbullrunner.com/route/"+ routeID+"/vehicles";
+		String urlStr = ""+ "https://usfbullrunner.com/route/"+ routeID+"/vehicles";
 		JSONArray jsonVehicle = _providerConfig.downloadCofiguration(new URL( urlStr ));
 		
 		for (int i= 0; i < jsonVehicle.length(); i++ ){
