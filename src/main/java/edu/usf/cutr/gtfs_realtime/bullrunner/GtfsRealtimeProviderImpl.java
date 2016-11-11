@@ -463,11 +463,11 @@ public class GtfsRealtimeProviderImpl {
 						vehiclePosition.setTrip(tripDescriptor);
 
 						if (info.APCPercentage <= 0) vehiclePosition.setOccupancyStatus( VehiclePosition.OccupancyStatus.EMPTY );
-						else if (info.APCPercentage >= 95) vehiclePosition.setOccupancyStatus( VehiclePosition.OccupancyStatus.FULL );
 						else if (info.APCPercentage <= 50) vehiclePosition.setOccupancyStatus( VehiclePosition.OccupancyStatus.MANY_SEATS_AVAILABLE );
 						else if (info.APCPercentage <= 70) vehiclePosition.setOccupancyStatus( VehiclePosition.OccupancyStatus.FEW_SEATS_AVAILABLE );
 						else if (info.APCPercentage <= 90) vehiclePosition.setOccupancyStatus( VehiclePosition.OccupancyStatus.STANDING_ROOM_ONLY );
-						else vehiclePosition.setOccupancyStatus( VehiclePosition.OccupancyStatus.CRUSHED_STANDING_ROOM_ONLY );
+						else if (info.APCPercentage <= 95) vehiclePosition.setOccupancyStatus( VehiclePosition.OccupancyStatus.CRUSHED_STANDING_ROOM_ONLY );
+						else vehiclePosition.setOccupancyStatus( VehiclePosition.OccupancyStatus.FULL );
 
 						vehicleDescriptor = VehicleDescriptor.newBuilder();
 						vehicleDescriptor.setId(vehicleId);
