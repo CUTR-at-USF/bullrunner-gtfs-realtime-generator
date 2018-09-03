@@ -15,7 +15,9 @@
  */
 package edu.usf.cutr.gtfs_realtime.bullrunner;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.net.URL;
 import java.util.HashSet;
@@ -124,7 +126,11 @@ public class GtfsRealtimeTripUpdatesProducerDemoMain {
 
 		 
 		 
-		_provider.setUrl(new URL( "http://api.syncromatics.com/feed/511/Prediction/?api_key=593e3f10de49d7fec7c8ace98f0ee6d1&format=json"));
+		_provider.setUrl(new URL( "http://api.syncromatics.com/portal/"));
+        BufferedReader tripsBuffer = new BufferedReader(new FileReader("../key.txt"));
+        String key = tripsBuffer.readLine();
+        _provider.setKey(key);
+
 		//only for test, creat a static json for 8:32pm, August 5th, 2014
 	    //_provider.setUrl(new URL( "http://myweb.usf.edu/~mona2/syncromticOffLine_8_32August5.json"));
 			

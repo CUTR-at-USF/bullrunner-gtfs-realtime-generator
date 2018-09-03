@@ -16,20 +16,18 @@
 package edu.usf.cutr.gtfs_realtime.bullrunner;
 
 
-import java.util.List;
+import java.io.InputStream;
+import java.net.SocketTimeoutException;
+import java.time.Instant;
+import java.util.*;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.Reader;
 import java.net.URL;
 import java.net.URLConnection;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Collections;
-import java.util.Date;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -46,7 +44,6 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
-import org.omg.CORBA.portable.InputStream;
 import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeExporterModule;
 import edu.usf.cutr.gtfs_realtime.bullrunner.GtfsRealtimeExporterCutr;
 import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeLibrary;
@@ -102,6 +99,7 @@ public class GtfsRealtimeProviderImpl {
 
 	private GtfsRealtimeExporterCutr _gtfsRealtimeProvider;
 	private URL _url;
+	private String _api_key;
 	private BiHashMap<String, String, Float> routeVehiDirMap;
 	private BiHashMap<String, String, vehicleInfo> tripVehicleInfoMap;
 	private BiHashMap<String, String, StartTimes> routeVehicleStartTimeMap;
@@ -125,6 +123,9 @@ public class GtfsRealtimeProviderImpl {
 	public void setUrl(URL url) {
 		_url = url;
 		// System.out.println(_url.toString());
+	}
+	public void setKey(String key){
+		_api_key = key;
 	}
 
 	/**
@@ -172,8 +173,8 @@ public class GtfsRealtimeProviderImpl {
 			_providerConfig.generateServiceMap();
 			_providerConfig.extractSeqId();
 			_providerConfig.extractStartTime();
-			
-			
+			_providerConfig.GenerateExternalIDMap();
+
 		} catch (Exception ex) {
 			_log.warn("Error in retriving confirmation data!", ex);
 		}
@@ -202,11 +203,74 @@ public class GtfsRealtimeProviderImpl {
 	 * positions as a result.
 	 */
 	private void refreshTripVehicle() throws IOException, JSONException {
-		 
-		Pair pair = downloadVehicleDetails();
-		JSONArray stopIDsArray = pair.getArray1();
-		JSONArray vehicleArray = pair.getArray2();
-		 
+
+	    // ---- START UPDATING VEHICLE POSITIONS -----------------
+	    // construct VehiclePosition feed
+        GtfsRealtimeFullUpdate vehiclePositions = new GtfsRealtimeFullUpdate();
+        int vehicleFeedID = 0;
+        // Loop through the external route id map to get vehicle locations for each route id
+        Iterator IT = _providerConfig.ExternalIDMap.entrySet().iterator();
+        while (IT.hasNext()){
+            Map.Entry pair = (Map.Entry) IT.next();
+            String route_id = pair.getKey().toString();
+            String external_id = pair.getValue().toString();
+
+            // get vehicle locations for this route_id:
+            JSONArray vehicleArray = downloadVehicleDetails(external_id);
+
+            // loop through vehicleArray to build vehiclePosition for the given route
+            for (int k = 0; k < vehicleArray.length(); k++){
+
+
+                JSONObject vehicleObj = vehicleArray.getJSONObject(k);
+                // initiate feed
+                TripDescriptor.Builder tripDescriptor = TripDescriptor.newBuilder();
+                Position.Builder position = Position.newBuilder();
+                VehicleDescriptor.Builder VehicleInfo = VehicleDescriptor.newBuilder();
+                FeedEntity.Builder vehiclePositionEntity = FeedEntity.newBuilder();
+
+                // set values for feed
+                tripDescriptor.setRouteId(route_id);
+                position.setBearing((float) vehicleObj.getDouble("headingDegrees"));
+                position.setLatitude((float) vehicleObj.getDouble("lat"));
+                position.setLongitude((float) vehicleObj.getDouble("lon"));
+                position.setSpeed((float) vehicleObj.getDouble("speed"));
+                VehicleInfo.setId(String.valueOf(vehicleObj.getInt("id")));
+                VehicleInfo.setLabel(vehicleObj.getString("name"));
+
+                // Build feed
+                VehiclePosition.Builder VehiclePosition_route = VehiclePosition.newBuilder();
+                VehiclePosition_route.setPosition(position);
+                VehiclePosition_route.setTrip(tripDescriptor);
+                VehiclePosition_route.setVehicle(VehicleInfo);
+                VehiclePosition_route.setTimestamp(
+						Instant.parse(vehicleObj.getString("lastUpdated")).getEpochSecond()
+				);
+                if (vehicleObj.getDouble("passengerLoad") <= 0) VehiclePosition_route.setOccupancyStatus( OccupancyStatus.EMPTY );
+                else if (vehicleObj.getDouble("passengerLoad") <= 50) VehiclePosition_route.setOccupancyStatus( OccupancyStatus.MANY_SEATS_AVAILABLE );
+                else if (vehicleObj.getDouble("passengerLoad") <= 70) VehiclePosition_route.setOccupancyStatus( OccupancyStatus.FEW_SEATS_AVAILABLE );
+                else if (vehicleObj.getDouble("passengerLoad") <= 90) VehiclePosition_route.setOccupancyStatus( OccupancyStatus.STANDING_ROOM_ONLY );
+                else if (vehicleObj.getDouble("passengerLoad") <= 95) VehiclePosition_route.setOccupancyStatus( OccupancyStatus.CRUSHED_STANDING_ROOM_ONLY );
+                else VehiclePosition_route.setOccupancyStatus( OccupancyStatus.FULL );
+
+                vehicleFeedID ++ ;
+                vehiclePositionEntity.setId(Integer.toString(vehicleFeedID));
+                vehiclePositionEntity.setVehicle(VehiclePosition_route);
+                vehiclePositions.addEntity(vehiclePositionEntity.build());
+            }
+        }
+        _vehiclePositionsSink.handleFullUpdate(vehiclePositions);
+        _log.info("vehicles' location extracted: " + vehiclePositions.getEntities().size());
+        // ---- END UPDATING VEHICLE POSITIONS -----------------
+
+        // ----- START UPDATING TRIP UPDATES, LEGACY FROM VERSION 0.9.0 ------------
+        // set to null for version 1.0.0
+        GtfsRealtimeFullUpdate tripUpdates = new GtfsRealtimeFullUpdate();
+        /*
+        Pair pair = downloadVehicleDetails();
+        JSONArray stopIDsArray = pair.getArray1();
+        JSONArray vehicleArray = pair.getArray2();
+
 		if (stopIDsArray.length() == 0) {
 			routeVehicleStartTimeMap.clear();
 		}
@@ -215,12 +279,10 @@ public class GtfsRealtimeProviderImpl {
 		String serviceID = _providerConfig.serviceIds[dayOfWeek];
  
 		GtfsRealtimeFullUpdate tripUpdates = new GtfsRealtimeFullUpdate();		
-  		GtfsRealtimeFullUpdate vehiclePositions = new GtfsRealtimeFullUpdate();
 
 		 VehicleDescriptor.Builder vehicleDescriptor = null;
 		 String route, trip;
 		 int entity = 0;
-		 int vehicleFeedID = 0;
 		 String stopId = "";
 		 String startTime = "";
 		 String stopSeq;
@@ -243,10 +305,10 @@ public class GtfsRealtimeProviderImpl {
 					_log.error("Route "+ route+ "dosn't exit in GTFS file");
 				int stopId_int = obj.getInt("stop");
 				stopId = Integer.toString(stopId_int);
-				JSONArray childArray = obj.getJSONArray("Ptimes");			 
-				
+				JSONArray childArray = obj.getJSONArray("Ptimes");
+
 				for (int j = 0; j < childArray.length(); j++) {
-					
+
 					JSONObject child = childArray.getJSONObject(j);
 					String predTimeStamp = child.getString("PredictionTime");
 					predictTime = convertTime(predTimeStamp);
@@ -308,11 +370,7 @@ public class GtfsRealtimeProviderImpl {
 		 for (int i=0; i< records.size();i++){  
 			 records.get(i).tripUpdate.addStopTimeUpdate(records.get(i).stopTimeUpdate);
 		 }
-		 
-		/**
-		 * Create a new feed entity to wrap the trip update and add it
-		 * to the GTFS-realtime trip updates feed.
-		 */	
+
 		
 		 for (int j = 0; j < tripUpdateArr.size(); j++){
 			FeedEntity.Builder tripUpdateEntity = FeedEntity.newBuilder();
@@ -410,81 +468,12 @@ public class GtfsRealtimeProviderImpl {
 			tripUpdateEntity.setTripUpdate(tripUpdate);
 			tripUpdates.addEntity(tripUpdateEntity.build());
 		 }
+		 */
+        // ----- END TRIP UPDATES ---------------
 		 _tripUpdatesSink.handleFullUpdate(tripUpdates);
-		  
 			 _log.info("stoIDs extracted: " + tripUpdates.getEntities().size());
 			// System.out.println("stoIDs extracted: " + tripUpdates.getEntityCount());
-			
-			 
-			 
-			 float bearing;
-			 for (int k = 0; k < vehicleArray.length(); k++) {
-					JSONObject vehicleObj = vehicleArray.getJSONObject(k);
 
-					// We only operate on "Route X" routes and ignore other strings
-					if (vehicleObj.getString("route").length() != 7) continue; 
-
-					route = vehicleObj.getString("route").substring(6);		 			
-					JSONArray vehicleLocsArray = vehicleObj .getJSONArray("VehicleLocation");
-					
-					for (int l = 0; l < vehicleLocsArray.length(); ++l) {
-						JSONObject child = vehicleLocsArray.getJSONObject(l);
-						double lat = child.getDouble("vehicleLat");
-						double lon = child.getDouble("vehicleLong");
-						/**
-						 * To construct our VehiclePosition, we create a position for
-						 * the vehicle. We add the position to a VehiclePosition
-						 * builder, along with the trip and vehicle descriptors.
-						 */
-						tripDescriptor = TripDescriptor.newBuilder();
-						tripDescriptor.setRouteId(route);
-						Position.Builder position = Position.newBuilder();
-						//position.setLatitude((float) lat);
-						//position.setLongitude((float) lon);
-
-						FeedEntity.Builder vehiclePositionEntity = FeedEntity
-								.newBuilder();
-						//int tripID_int = child.getInt("tripId"); 
-						String vehicleId = child.getString("VehicleId");	
-						if (!routeVehiDirMap.containsKey(route))						
-							extractHeading(route);
-
-						vehicleInfo info = tripVehicleInfoMap.get(route, vehicleId);
-						
-						//_log.info("vehicles' info: " + info); 
-						bearing = info.bearing;
-						
-								//routeVehiDirMap.get(route, vehicleId);	
-						position.setBearing(bearing);
-						position.setLatitude(info.lat);
-						position.setLongitude(info.longi);
-						VehiclePosition.Builder vehiclePosition = VehiclePosition.newBuilder();
-						vehiclePosition.setPosition(position);
-						vehiclePosition.setTrip(tripDescriptor);
-
-						if (info.APCPercentage <= 0) vehiclePosition.setOccupancyStatus( VehiclePosition.OccupancyStatus.EMPTY );
-						else if (info.APCPercentage <= 50) vehiclePosition.setOccupancyStatus( VehiclePosition.OccupancyStatus.MANY_SEATS_AVAILABLE );
-						else if (info.APCPercentage <= 70) vehiclePosition.setOccupancyStatus( VehiclePosition.OccupancyStatus.FEW_SEATS_AVAILABLE );
-						else if (info.APCPercentage <= 90) vehiclePosition.setOccupancyStatus( VehiclePosition.OccupancyStatus.STANDING_ROOM_ONLY );
-						else if (info.APCPercentage <= 95) vehiclePosition.setOccupancyStatus( VehiclePosition.OccupancyStatus.CRUSHED_STANDING_ROOM_ONLY );
-						else vehiclePosition.setOccupancyStatus( VehiclePosition.OccupancyStatus.FULL );
-
-						vehicleDescriptor = VehicleDescriptor.newBuilder();
-						vehicleDescriptor.setId(vehicleId);
-						
-						vehicleFeedID ++;
-
-						vehiclePositionEntity.setId(Integer.toString(vehicleFeedID));
-						vehiclePosition.setVehicle(vehicleDescriptor);
-						vehiclePositionEntity.setVehicle(vehiclePosition);
-						
-						vehiclePositions.addEntity(vehiclePositionEntity.build());
-						
-					}
-		 		}
-			 _vehiclePositionsSink.handleFullUpdate(vehiclePositions);
-			 _log.info("vehicles' location extracted: " + vehiclePositions.getEntities().size());	
-			 //System.out.println("vehicles' location extracted: " + vehiclePositions.getEntityCount());
 	}
  
  
@@ -511,45 +500,35 @@ public class GtfsRealtimeProviderImpl {
 		}
 	}
 
-	private Pair downloadVehicleDetails() throws IOException, JSONException {
+	/* Hit the API and Get Vehicle locations for a given external route_id (Syncromatics route id)
+	 *  */
+	private JSONArray downloadVehicleDetails(String external_route_id) throws IOException, JSONException {
 		URLConnection connection = null;
+		URL URL_Request = new URL(_url + "routes/" + external_route_id + "/vehicles?api-key=" + _api_key );
 		try {
-		    connection = _url.openConnection();
+		    connection = URL_Request.openConnection();
 		  } catch (Exception ex) {
 		    _log.error("Error in opening feeds url", ex);
 		  }
-		  
-		  connection.setConnectTimeout(10000);  // connectTimeout is time out in miliseconds
-		  connection.setReadTimeout(10000);
-		  java.io.InputStream in =  connection.getInputStream();
+		connection.setConnectTimeout(10000);  // connectTimeout is time out in miliseconds
+		connection.setReadTimeout(10000);
+		InputStream in =  connection.getInputStream();
 
-		  BufferedReader reader = new BufferedReader(new InputStreamReader(in, "UTF-8"));
+		BufferedReader reader = new BufferedReader(new InputStreamReader(in, "UTF-8"));
 
-		  StringBuilder builder = new StringBuilder();
-		  String inputLine;
-		  JSONArray stopIDsArray;
-		  JSONArray vehicleArray;
-		  try {
-		    while ((inputLine = reader.readLine()) != null)
-		      builder.append(inputLine).append("\n");
+		StringBuilder builder = new StringBuilder();
+		String inputLine;
+        JSONArray response;
+		try {
+		  while ((inputLine = reader.readLine()) != null)
+		    builder.append(inputLine).append("\n");
+		  response = new JSONArray(builder.toString());
+        } catch (SocketTimeoutException ex) {
+            _log.error("Error readline, server doesn't close the connection.", ex);
+            response = null;
+        }
 
-		    JSONObject object = (JSONObject) new JSONTokener(builder.toString())
-		            .nextValue();
-
-		    String data = object.getString("PredictionData");
-		    JSONObject child2_obj = new JSONObject(data);
-		    responseTimeStamp = child2_obj.getString("TimeStamp");
-		     stopIDsArray = child2_obj.getJSONArray("StopPredictions");
-		     vehicleArray = child2_obj.getJSONArray("VehicleLocationData");
-
-		  } catch (java.net.SocketTimeoutException ex) {
-			  _log.error("Error readline, server dosn't close the connection.", ex);
-		    stopIDsArray = null;
-		    vehicleArray = null;
-		  }
-		  return new Pair(stopIDsArray, vehicleArray);
-
-	 
+		  return response;
 	}
 
 	/**

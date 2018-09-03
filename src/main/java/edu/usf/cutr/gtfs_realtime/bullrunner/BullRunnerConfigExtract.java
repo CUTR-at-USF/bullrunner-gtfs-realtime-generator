@@ -15,11 +15,11 @@ import org.json.JSONTokener;
  
 public class BullRunnerConfigExtract {
 	//private URL _url;
-	 private static final String path2tripsFile = "../myGTFS/trips.txt";
-	 private static final String path2calFile = "../myGTFS/calendar.txt";
-	 private static final String path2routeFile = "../myGTFS/routes.txt";
-	 private static final String path2stopTimesFile = "../myGTFS/stop_times.txt";
-	 private static final String path2frequenciesFile = "../myGTFS/frequencies.txt";
+	 private static final String path2tripsFile = "../bullrunner-gtfs/trips.txt";
+	 private static final String path2calFile = "../bullrunner-gtfs/calendar.txt";
+	 private static final String path2routeFile = "../bullrunner-gtfs/routes.txt";
+	 private static final String path2stopTimesFile = "../bullrunner-gtfs/stop_times.txt";
+	 private static final String path2frequenciesFile = "../bullrunner-gtfs/frequencies.txt";
 	/**
 	 * @param url
 	 *            the URL for the SEPTA vehicle data API.
@@ -33,6 +33,7 @@ public class BullRunnerConfigExtract {
 	public String[] serviceIds = new String[7];  
 	public BiHashMap<String , String, String> tripIDMap = new BiHashMap<String, String, String>();
 	public HashMap<String , String> startTimeByTripIDMap = new HashMap<String, String>();
+	public HashMap<String, String> ExternalIDMap = new HashMap<String, String>();
 	public BiHashMap<String, String, String> stopSeqIDMap = new BiHashMap<String, String, String>();
 	/**
 	 * @return a JSON array parsed from the data pulled from the SEPTA vehicle
@@ -195,4 +196,17 @@ public class BullRunnerConfigExtract {
 			frequencies.close();
 		}
 	}
+
+	/* This function create a mapping between Syncromatics' route id and Bullrunner
+	 * official route id (A, B, C, etc.)
+	 */
+
+	public void GenerateExternalIDMap() throws IOException{
+	    BufferedReader routesBuffer = new BufferedReader(new FileReader(path2routeFile));
+	    String line = routesBuffer.readLine();
+	    while ((line = routesBuffer.readLine()) != null){
+	        String[] Route = line.split(",");
+            ExternalIDMap.put(Route[0], Route[7].toString());
+        }
+    }
 }
