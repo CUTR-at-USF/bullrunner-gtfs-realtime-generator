@@ -15,7 +15,7 @@ To see a plain text representation, add `?debug` to the end of the URL:
 
 To run: 
 1. Create key.txt file in the main directory and save the API key in the file (API key can be requested from [Syncromatics](http://gmvsyncromatics.com/contact/))
-2. Extract the bullrunner-gtfs.zip file
+2. Extract the bullrunner-gtfs.zip file in the same folder. The extracted folder should be name "bullrunner-gtfs"
 3. Build `mvn package`
-4. Run `java -jar target/cutr-gtfs-realtime-bullrunner-0.9.0-SNAPSHOT.jar  --tripUpdatesUrl=http://localhost:8080/trip-updates   --vehiclePositionsUrl=http://localhost:8080/vehicle-positions`
+4. Run `cd target; java -jar cutr-gtfs-realtime-bullrunner-1.0.0-SNAPSHOT.jar  --tripUpdatesUrl=http://localhost:8080/trip-updates   --vehiclePositionsUrl=http://localhost:8080/vehicle-positions`
 
