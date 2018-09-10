@@ -15,52 +15,35 @@
  */
 package edu.usf.cutr.gtfs_realtime.bullrunner;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
-import java.net.URL;
-import java.util.HashSet;
-import java.util.Set;
-
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.GnuParser;
-import org.apache.commons.cli.Options;
-import org.apache.commons.cli.Parser;
-import org.json.JSONException;
-import org.onebusaway.cli.CommandLineInterfaceLibrary;
-import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeFileWriter;
-import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeServlet;
-import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeSource;
-
-import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeGuiceBindingTypes;
-import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeGuiceBindingTypes.VehiclePositions;
-import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeGuiceBindingTypes.TripUpdates;
-import org.onebusaway.guice.jsr250.JSR250Module;
-import org.onebusaway.guice.jsr250.LifecycleService;
-
 import com.google.inject.Guice;
 import com.google.inject.Inject;
 import com.google.inject.Injector;
 import com.google.inject.Module;
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.GnuParser;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.Parser;
+import org.onebusaway.cli.CommandLineInterfaceLibrary;
+import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeFileWriter;
+import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeGuiceBindingTypes.TripUpdates;
+import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeGuiceBindingTypes.VehiclePositions;
+import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeServlet;
+import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeSource;
+import org.onebusaway.guice.jsr250.LifecycleService;
+
+import java.io.File;
+import java.net.URL;
+import java.util.HashSet;
+import java.util.Set;
 
 public class GtfsRealtimeTripUpdatesProducerDemoMain {
-
     private static final String ARG_TRIP_UPDATES_PATH = "tripUpdatesPath";
-
     private static final String ARG_TRIP_UPDATES_URL = "tripUpdatesUrl";
-
     private static final String ARG_VEHICLE_POSITIONS_PATH = "vehiclePositionsPath";
-
     private static final String ARG_VEHICLE_POSITIONS_URL = "vehiclePositionsUrl";
     private GtfsRealtimeProviderImpl _provider;
-    //	private BullRunnerConfigExtract _providerConfig;
     private LifecycleService _lifecycleService;
     private GtfsRealtimeSource _tripUpdates;
-    //	@Inject
-//	public void setProvider(BullRunnerConfigExtract providerConfig) {
-//		_providerConfig = providerConfig;
-//	}
     private GtfsRealtimeSource _vehiclePositions;
 
     public static void main(String[] args) throws Exception {
@@ -68,24 +51,11 @@ public class GtfsRealtimeTripUpdatesProducerDemoMain {
         m.run(args);
     }
 
-/*
-	@Inject
-	public void setVehiclePositionsProducer(VehiclePositionsProducer producer) {
-	    // This is just here to make sure VehiclePositionsProducer gets instantiated.
-	}
-*/
-
     @Inject
     public void setVehiclePositionsSource(@VehiclePositions GtfsRealtimeSource vehiclePositionsSource) {
         _vehiclePositions = vehiclePositionsSource;
     }
- 
-/* 
-        @Inject
-        public void setTripUpdatesProducer(TripUpdatesProducer producer) {
-            // This is just here to make sure TripUpdatesProducer gets instantiated.
-        }
-*/
+
 
     @Inject
     public void setTripUpdatesSource(@TripUpdates GtfsRealtimeSource tripUpdatesSource) {
@@ -122,15 +92,8 @@ public class GtfsRealtimeTripUpdatesProducerDemoMain {
         Injector injector = Guice.createInjector(modules);
         injector.injectMembers(this);
 
-
         _provider.setUrl(new URL("http://api.syncromatics.com/portal/"));
-        BufferedReader tripsBuffer = new BufferedReader(new FileReader("../key.txt"));
-        String key = tripsBuffer.readLine();
-        _provider.setKey(key);
-
-        //only for test, creat a static json for 8:32pm, August 5th, 2014
-        //_provider.setUrl(new URL( "http://myweb.usf.edu/~mona2/syncromticOffLine_8_32August5.json"));
-
+        _provider.setKey();
 
         if (cli.hasOption(ARG_TRIP_UPDATES_URL)) {
             URL url = new URL(cli.getOptionValue(ARG_TRIP_UPDATES_URL));

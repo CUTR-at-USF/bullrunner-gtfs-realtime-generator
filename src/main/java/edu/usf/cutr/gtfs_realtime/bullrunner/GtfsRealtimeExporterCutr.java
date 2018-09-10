@@ -1,19 +1,5 @@
 package edu.usf.cutr.gtfs_realtime.bullrunner;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CopyOnWriteArrayList;
-
-import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeExporter.AlertsExporter;
-import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeExporter.MixedFeedExporter;
-import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeExporter.TripUpdatesExporter;
-import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeExporter.VehiclePositionsExporter;
-import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeIncrementalListener;
-import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeIncrementalUpdate;
-import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeFullUpdate;
-
-
 import com.google.transit.realtime.GtfsRealtime.FeedEntity;
 import com.google.transit.realtime.GtfsRealtime.FeedHeader;
 import com.google.transit.realtime.GtfsRealtime.FeedHeader.Incrementality;
@@ -21,6 +7,18 @@ import com.google.transit.realtime.GtfsRealtime.FeedMessage;
 import com.google.transit.realtime.GtfsRealtimeConstants;
 import com.google.transit.realtime.GtfsRealtimeOneBusAway;
 import com.google.transit.realtime.GtfsRealtimeOneBusAway.OneBusAwayFeedHeader;
+import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeExporter.AlertsExporter;
+import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeExporter.MixedFeedExporter;
+import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeExporter.TripUpdatesExporter;
+import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeExporter.VehiclePositionsExporter;
+import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeFullUpdate;
+import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeIncrementalListener;
+import org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeIncrementalUpdate;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Private implementation of {@link GtfsRealtimeExporter}.

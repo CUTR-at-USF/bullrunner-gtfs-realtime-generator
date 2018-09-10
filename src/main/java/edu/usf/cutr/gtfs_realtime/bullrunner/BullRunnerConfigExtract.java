@@ -1,32 +1,47 @@
 package edu.usf.cutr.gtfs_realtime.bullrunner;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.URL;
-import java.util.HashMap;
-
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.HashMap;
+
 
 public class BullRunnerConfigExtract {
     //private URL _url;
-    private static final String path2tripsFile = "../bullrunner-gtfs/trips.txt";
-    private static final String path2calFile = "../bullrunner-gtfs/calendar.txt";
-    private static final String path2routeFile = "../bullrunner-gtfs/routes.txt";
-    private static final String path2stopTimesFile = "../bullrunner-gtfs/stop_times.txt";
-    private static final String path2frequenciesFile = "../bullrunner-gtfs/frequencies.txt";
-    /**
-     * @param url
-     * the URL for the SEPTA vehicle data API.
-     */
+    private static String path2tripsFile ;
+    private static String path2calFile;
+    private static String path2routeFile;
+    private static String path2stopTimesFile ;
+    private static String path2frequenciesFile;
+
 //	public void setUrl(URL url) {
 //		_url = url;
 //	}
+
+    public void findPaths() {
+        String GTFS_path;
+        if (Files.exists(Paths.get("./bullrunner-gtfs"))){
+            GTFS_path = "./bullrunner-gtfs";
+        } else if (Files.exists(Paths.get("../bullrunner-gtfs"))){
+            GTFS_path = "../bullrunner-gtfs";
+        } else {
+            throw new Error("GTFS FILE NOT FOUND! MAKE SURE YOU HAVE EXTRACTED THE GTFS ZIP FILE IN THE MAIN DIRECTORY OR IN THE TARGET DIRECTORY");
+        }
+        path2tripsFile = GTFS_path + "/trips.txt";
+        path2calFile = GTFS_path + "/calendar.txt";
+        path2routeFile = GTFS_path + "/routes.txt";
+        path2stopTimesFile = GTFS_path + "/stop_times.txt";
+        path2frequenciesFile = GTFS_path + "/frequencies.txt";
+    }
 
     public HashMap<String, Integer> routesMap = new HashMap<String, Integer>();
     //public HashMap<Integer , String> serviceIDMap = new HashMap<Integer, String>();
