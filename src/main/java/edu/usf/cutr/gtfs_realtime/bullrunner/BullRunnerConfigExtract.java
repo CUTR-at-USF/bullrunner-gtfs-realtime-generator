@@ -23,10 +23,9 @@ public class BullRunnerConfigExtract {
     private static String path2stopTimesFile ;
     private static String path2frequenciesFile;
 
-//	public void setUrl(URL url) {
-//		_url = url;
-//	}
-
+    /** Find the bullrunner GTFS directory in the current directory or the parent directory
+     *  If not found, throw an Error and exit
+     */
     public void findPaths() {
         String GTFS_path;
         if (Files.exists(Paths.get("./bullrunner-gtfs"))){

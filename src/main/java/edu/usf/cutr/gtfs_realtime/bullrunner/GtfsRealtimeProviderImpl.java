@@ -64,7 +64,9 @@ public class GtfsRealtimeProviderImpl {
 
     private static final Logger _log = LoggerFactory
             .getLogger(GtfsRealtimeProviderImpl.class);
+    private static final int _Conn_Timeout_MS = (int) TimeUnit.SECONDS.toMillis(10); // connection time out 10s
     private ScheduledExecutorService _executor;
+    private GtfsRealtimeExporterCutr _gtfsRealtimeProvider;
     private URL _url;
     private String _api_key;
 
@@ -73,6 +75,14 @@ public class GtfsRealtimeProviderImpl {
      */
     private int _refreshInterval = 30;
     private BullRunnerConfigExtract _providerConfig;
+
+    @Inject
+    public void setGtfsRealtimeProvider(
+            GtfsRealtimeExporterCutr gtfsRealtimeProvider) {
+        _gtfsRealtimeProvider = gtfsRealtimeProvider;
+    }
+
+
     private GtfsRealtimeSink _vehiclePositionsSink;
     private GtfsRealtimeSink _tripUpdatesSink;
 
@@ -112,6 +122,11 @@ public class GtfsRealtimeProviderImpl {
         // System.out.println(_url.toString());
     }
 
+    /**
+     * Find the key file in the current directory and then in the parent directory
+     * If not found, throw an Error and exit
+     * @throws IOException
+     */
     public void setKey() throws IOException { // try to find key file and set API key
         String keyPath;
         if (Files.exists(Paths.get("./key.txt"))){
@@ -130,6 +145,9 @@ public class GtfsRealtimeProviderImpl {
      * @param refreshInterval
      *            how often vehicle data will be downloaded, in seconds.
      */
+    public void setRefreshInterval(int refreshInterval) {
+        _refreshInterval = refreshInterval;
+    }
 
     /**
      * The start method automatically starts up a recurring task that
@@ -260,12 +278,21 @@ public class GtfsRealtimeProviderImpl {
         _vehiclePositionsSink.handleFullUpdate(vehiclePositions);
         _log.info("vehicles' location extracted: " + vehiclePositions.getEntities().size());
         // ---- END UPDATING VEHICLE POSITIONS -----------------
-        // ---- TRIP UPDATES REMOVED --------------------
+        /* ---- TRIP UPDATES WAS REMOVED FROM VERSION 1.0-------------------
+        * We have experienced inconsistencies in the generated trip_updates,
+        * (see issue #8 (https://github.com/CUTR-at-USF/bullrunner-gtfs-realtime-generator/issues/8)
+        * So we decided to remove trip_updates until we find a better solution.
+        * */
     }
 
 
-    /* Method to hit the API and Get Vehicle locations for a given external route_id (Syncromatics route id)
-     *  */
+    /**
+     * Method to hit the API and Get Vehicle locations for a given external route_id (Syncromatics route id)
+     * @param external_route_id
+     * @return JSONArray of vehicle locations
+     * @throws IOException
+     * @throws JSONException
+     */
     private JSONArray downloadVehicleDetails(String external_route_id) throws IOException, JSONException {
         URLConnection connection = null;
         URL URL_Request = new URL(_url + "routes/" + external_route_id + "/vehicles?api-key=" + _api_key);
@@ -274,8 +301,8 @@ public class GtfsRealtimeProviderImpl {
         } catch (Exception ex) {
             _log.error("Error in opening feeds url", ex);
         }
-        connection.setConnectTimeout(10000);  // connectTimeout is time out in miliseconds
-        connection.setReadTimeout(10000);
+        connection.setConnectTimeout(_Conn_Timeout_MS);
+        connection.setReadTimeout(_Conn_Timeout_MS);
         InputStream in = connection.getInputStream();
 
         BufferedReader reader = new BufferedReader(new InputStreamReader(in, "UTF-8"));
@@ -295,11 +322,22 @@ public class GtfsRealtimeProviderImpl {
         return response;
     }
 
-    /* Method to get Vehicle locations for MSC Express (has the same route_id with C)
-    route id must be C or MSC Express
-     *  */
+    /**
+     * Method to get Vehicle locations for MSC Express (has the same route_id with C)
+     *     route id must be C or MSC Express
+     * @param route_id
+     * @param external_route_id
+     * @return JSONArray of vehicle locations for given route
+     * @throws IOException
+     * @throws JSONException
+     */
     private JSONArray downloadVehicleDetails_C(String route_id, String external_route_id) throws IOException, JSONException {
-        if ((!route_id.equals("C")) & (!route_id.equals("MSC Express"))) {
+        final String Pattern_name_C = "Route C";
+        final String Pattern_name_MSC = "MSC Express";
+        final String Route_id_C = "C";
+        final String Route_id_MSC = "MSC Express";
+
+        if ((!route_id.equals(Route_id_C)) & (!route_id.equals(Route_id_MSC))) {
             throw new Error("Method downloadVehicleDetails_C only applies to route C or MSC Express");
         }
         URLConnection connection = null;
@@ -309,8 +347,8 @@ public class GtfsRealtimeProviderImpl {
         } catch (Exception ex) {
             _log.error("Error in opening feeds url", ex);
         }
-        connection.setConnectTimeout(10000);  // connectTimeout is time out in miliseconds
-        connection.setReadTimeout(10000);
+        connection.setConnectTimeout(_Conn_Timeout_MS);
+        connection.setReadTimeout(_Conn_Timeout_MS);
         InputStream in = connection.getInputStream();
 
         BufferedReader reader = new BufferedReader(new InputStreamReader(in, "UTF-8"));
@@ -327,6 +365,9 @@ public class GtfsRealtimeProviderImpl {
             response = null;
         }
 
+        if (response.length() == 0)
+            return null;
+
         // keep only vehicles of the given route_id
         JSONArray response_out = new JSONArray();
         for (int i = 0; i < response.length(); i++){
@@ -339,8 +380,8 @@ public class GtfsRealtimeProviderImpl {
             } catch (Exception ex) {
                 _log.error("Error in opening feeds url", ex);
             }
-            connection.setConnectTimeout(10000);  // connectTimeout is time out in miliseconds
-            connection.setReadTimeout(10000);
+            connection.setConnectTimeout(_Conn_Timeout_MS);
+            connection.setReadTimeout(_Conn_Timeout_MS);
             in = connection.getInputStream();
 
             BufferedReader reader1 = new BufferedReader(new InputStreamReader(in, "UTF-8"));
@@ -352,18 +393,20 @@ public class GtfsRealtimeProviderImpl {
                 while ((inputLine1 = reader1.readLine()) != null)
                     builder1.append(inputLine1).append("\n");
                 response_pattern = new JSONArray(builder1.toString());
+                String pattern_name = response_pattern.getJSONObject(0).getJSONObject("pattern").getString("name");
             } catch (SocketTimeoutException ex) {
                 _log.error("Error readline, server doesn't close the connection.", ex);
                 response_pattern = null;
+                return null;
             }
-            String pattern_name = response_pattern.getJSONObject(1).getJSONObject("pattern").getString("name");
+            String pattern_name = response_pattern.getJSONObject(0).getJSONObject("pattern").getString("name");
 
             // check if pattern name matches
-            if (pattern_name.equals("Route C")){
-                if (route_id.equals("C"))
+            if (pattern_name.equals(Pattern_name_C)){
+                if (route_id.equals(Route_id_C))
                     response_out.put(vehicleObj);
-            } else if (pattern_name.equals("MSC Express")){
-                if (route_id.equals("MSC Express"))
+            } else if (pattern_name.equals(Pattern_name_MSC)){
+                if (route_id.equals(Route_id_MSC))
                     response_out.put(vehicleObj);
             } else {
                 throw new Error("NEW PATTERN NAME DETECTED FOR ROUTE C IN THE API: " + pattern_name);
