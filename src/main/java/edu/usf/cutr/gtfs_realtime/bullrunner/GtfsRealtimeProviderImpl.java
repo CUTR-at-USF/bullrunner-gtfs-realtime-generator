@@ -40,6 +40,7 @@ import java.net.URLConnection;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.util.Calendar;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.Executors;
@@ -242,12 +243,14 @@ public class GtfsRealtimeProviderImpl {
 
                 // set values for feed
                 tripDescriptor.setRouteId(route_id);
+                tripDescriptor.setTripId(findTripID(route_id));
                 position.setBearing((float) Math.round(100*vehicleObj.getDouble("headingDegrees"))/100);
                 position.setLatitude((float) vehicleObj.getDouble("lat"));
                 position.setLongitude((float) vehicleObj.getDouble("lon"));
                 position.setSpeed((float) Math.round(100*vehicleObj.getDouble("speed"))/100);
                 VehicleInfo.setId(vehicleObj.getString("name"));
                 VehicleInfo.setLabel(vehicleObj.getString("name"));
+                tripDescriptor.setScheduleRelationship(TripDescriptor.ScheduleRelationship.UNSCHEDULED);
 
                 // Build feed
                 VehiclePosition.Builder VehiclePosition_route = VehiclePosition.newBuilder();
@@ -433,6 +436,26 @@ public class GtfsRealtimeProviderImpl {
                 _log.warn("Error in vehicle refresh task", ex);
             }
         }
+    }
+
+    /**
+     * Method to find trip_id of the given route
+     * First find service_id from the day today then use the mapping from trips.txt
+     */
+    private String findTripID(String route_id){
+        // get int current day of week (Sun-Sat = 0-7)
+        int current_day = Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1;
+
+        // get service_id for today
+        String serviceID = _providerConfig.serviceIds[current_day];
+
+        // use service_id and route_id to find trip_id
+        String trip_id = _providerConfig.tripIDMap.get(route_id, serviceID);
+
+        if (trip_id == null || trip_id.equals(""))
+            _log.error("Cannot find trip_id for Route " + route_id + " and service_id " + serviceID);
+
+        return trip_id;
     }
 
 }
