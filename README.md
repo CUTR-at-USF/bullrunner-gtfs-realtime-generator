@@ -5,7 +5,7 @@ Desktop application that retrieves AVL data from the USF Bull Runner's AVL syste
 
 Protobuf URL endpoints for the feed: 
 
-* tripUpdatesUrl = `http://localhost:8088/trip-updates`
+* tripUpdatesUrl = `http://localhost:8088/trip-updates` (NOTE: in version 1.0.0, tripUpdates is empty)
 * vehiclePositionsUrl = `http://localhost:8088/vehicle-positions`
 
 To see a plain text representation, add `?debug` to the end of the URL:
@@ -14,10 +14,8 @@ To see a plain text representation, add `?debug` to the end of the URL:
 * vehiclePositionsUrl = `http://localhost:8088/vehicle-positions?debug`
 
 To run: 
-
-`java -jar cutr-gtfs-realtime-bullrunner-0.9.0-SNAPSHOT.jar  --tripUpdatesUrl=http://localhost:8080/trip-updates   --vehiclePositionsUrl=http://localhost:8080/vehicle-positions`
-
-...from TARGET directory
-
-The Bull Runner GTFS can be found [here](https://github.com/CUTR-at-USF/bullrunner-gtfs-realtime-generator/blob/master/bullrunner-gtfs.zip) and should be extracted into `../myGTFS/`, as the GTFS-rt feed requires it to run.
+1. Create key.txt file in the main directory and save the API key in the file (API key can be requested from [Syncromatics](http://gmvsyncromatics.com/contact/))
+2. Extract the bullrunner-gtfs.zip file in the same folder. The extracted folder should be name "bullrunner-gtfs"
+3. Build `mvn package`
+4. Run `java -jar target/cutr-gtfs-realtime-bullrunner-1.0.0-SNAPSHOT.jar --vehiclePositionsUrl=http://localhost:8088/vehicle-positions`
 
