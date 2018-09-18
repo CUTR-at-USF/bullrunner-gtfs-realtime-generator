@@ -1,3 +1,18 @@
+/**
+ * Copyright (C) 2012-2018 Google, Inc., University of South Florida
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package edu.usf.cutr.gtfs_realtime.bullrunner;
 
 import org.json.JSONArray;
@@ -13,18 +28,26 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.Map;
 
 
 public class BullRunnerConfigExtract {
-    //private URL _url;
-    private static String path2tripsFile ;
-    private static String path2calFile;
-    private static String path2routeFile;
-    private static String path2stopTimesFile ;
-    private static String path2frequenciesFile;
+    private static String mPath2tripsFile;
+    private static String mPath2calFile;
+    private static String mPath2routeFile;
+    private static String mPath2stopTimesFile;
+    private static String mPath2frequenciesFile;
 
-    /** Find the bullrunner GTFS directory in the current directory or the parent directory
-     *  If not found, throw an Error and exit
+    Map<String, Integer> mRoutesMap = new HashMap<>();
+    String[] mServiceIds = new String[7];
+    BiHashMap<String, String, String> mTripIDMap = new BiHashMap<>();
+    Map<String, String> mStartTimeByTripIDMap = new HashMap<>();
+    Map<String, String> mExternalIDMap = new HashMap<>();
+    BiHashMap<String, String, String> mStopSeqIdMap = new BiHashMap<>();
+
+    /**
+     * Find the USF Bull Runner GTFS directory in the current directory or the parent directory.
+     * If not found, throw an Error and exit
      */
     public void findPaths() {
         String GTFS_path;
@@ -33,37 +56,28 @@ public class BullRunnerConfigExtract {
         } else if (Files.exists(Paths.get("../bullrunner-gtfs"))){
             GTFS_path = "../bullrunner-gtfs";
         } else {
-            throw new Error("GTFS FILE NOT FOUND! MAKE SURE YOU HAVE EXTRACTED THE GTFS ZIP FILE IN THE MAIN DIRECTORY OR IN THE TARGET DIRECTORY");
+            throw new IllegalArgumentException("GTFS FILE NOT FOUND! MAKE SURE YOU HAVE EXTRACTED THE GTFS ZIP FILE IN THE MAIN DIRECTORY OR IN THE TARGET DIRECTORY");
         }
-        path2tripsFile = GTFS_path + "/trips.txt";
-        path2calFile = GTFS_path + "/calendar.txt";
-        path2routeFile = GTFS_path + "/routes.txt";
-        path2stopTimesFile = GTFS_path + "/stop_times.txt";
-        path2frequenciesFile = GTFS_path + "/frequencies.txt";
+        mPath2tripsFile = GTFS_path + "/trips.txt";
+        mPath2calFile = GTFS_path + "/calendar.txt";
+        mPath2routeFile = GTFS_path + "/routes.txt";
+        mPath2stopTimesFile = GTFS_path + "/stop_times.txt";
+        mPath2frequenciesFile = GTFS_path + "/frequencies.txt";
     }
 
-    public HashMap<String, Integer> routesMap = new HashMap<String, Integer>();
-    //public HashMap<Integer , String> serviceIDMap = new HashMap<Integer, String>();
-    public String[] serviceIds = new String[7];
-    public BiHashMap<String, String, String> tripIDMap = new BiHashMap<String, String, String>();
-    public HashMap<String, String> startTimeByTripIDMap = new HashMap<String, String>();
-    public HashMap<String, String> ExternalIDMap = new HashMap<String, String>();
-    public BiHashMap<String, String, String> stopSeqIDMap = new BiHashMap<String, String, String>();
-
     /**
-     * @return a JSON array parsed from the data pulled from the SEPTA vehicle
-     * data API.
+     * @return a JSON array parsed from the data pulled from the USF Bull Runner Syncromatics API.
      */
-    public JSONArray downloadCofiguration(URL _url) throws IOException, JSONException {
+    public JSONArray downloadCofiguration(URL url) throws IOException, JSONException {
 
-        BufferedReader reader = new BufferedReader(new InputStreamReader(
-                _url.openStream()));
+        BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()));
 
         StringBuilder builder = new StringBuilder();
         String inputLine;
 
-        while ((inputLine = reader.readLine()) != null)
+        while ((inputLine = reader.readLine()) != null) {
             builder.append(inputLine).append("\n");
+        }
 
         JSONArray object = (JSONArray) new JSONTokener(builder.toString())
                 .nextValue();
@@ -71,9 +85,9 @@ public class BullRunnerConfigExtract {
         return object;
     }
 
-    public void generatesRouteMap(URL _url) throws IOException, JSONException {
+    public void generatesRouteMap(URL url) throws IOException, JSONException {
 
-        JSONArray configArray = downloadCofiguration(_url);
+        JSONArray configArray = downloadCofiguration(url);
 
         for (int i = 0; i < configArray.length(); i++) {
 
@@ -84,61 +98,54 @@ public class BullRunnerConfigExtract {
              */
             int ID = obj.getInt("ID");
             String route = obj.getString("DisplayName").substring(0, 1);
-            routesMap.put(route, ID);
+            mRoutesMap.put(route, ID);
         }
     }
 
-    //extracting the service_id for dayOfWeek
+    //
+
+    /**
+     * Extract the service_id for day of week
+     * @throws IOException
+     */
     public void generateServiceMap() throws IOException {
         String splitBy = ",";
         String line;
-        BufferedReader servicesBuffer = new BufferedReader(new FileReader(path2calFile));
+        BufferedReader servicesBuffer = new BufferedReader(new FileReader(mPath2calFile));
         line = servicesBuffer.readLine();
         while ((line = servicesBuffer.readLine()) != null) {
             String[] tokens = line.split(splitBy);
             for (int i = 1; i <= 7; i++) {
                 int day = Integer.parseInt(tokens[i]);
                 if (day == 1) {
-                    if (i != 7)
-                        serviceIds[i] = tokens[0];
-                    else
-                        serviceIds[0] = tokens[0];
+                    if (i != 7) {
+                        mServiceIds[i] = tokens[0];
+                    } else {
+                        mServiceIds[0] = tokens[0];
+                    }
                 }
             }
         }
     }
 
     public void generateTripMap() throws IOException {
-
         String line;
-        BufferedReader tripsBuffer = new BufferedReader(new FileReader(path2tripsFile));
+        BufferedReader tripsBuffer = new BufferedReader(new FileReader(mPath2tripsFile));
 
         String splitBy = ",";
         line = tripsBuffer.readLine();
         while ((line = tripsBuffer.readLine()) != null) {
             String[] tripRoute = line.split(splitBy);
             //System.out.println(tripRoute[0]+" , "+ tripRoute[1]+" , "+ tripRoute[2]);
-            tripIDMap.put(tripRoute[0], tripRoute[1], tripRoute[2]);
+            mTripIDMap.put(tripRoute[0], tripRoute[1], tripRoute[2]);
         }
 
     }
 
 
     /**
-     * Associates the specified value with the specified keys in this map (optional operation). If the map previously
-     * contained a mapping for the key, the old value is replaced by the specified value.
-     *
-     * @param key1
-     *            the first key
-     * @param key2
-     *            the second key
-     * @param value
-     *            the value to be set
-     */
-
-    /**
-     * this function extract the corresponding sequence ID for each stop ID from stop_times.txt in GTFS files
-     * we need tripID and stopID to extract stop sequence
+     * This function extract the corresponding sequence ID for each stop ID from stop_times.txt in GTFS files.
+     * We need tripID and stopID to extract stop sequence.
      *
      * @throws IOException
      */
@@ -148,9 +155,8 @@ public class BullRunnerConfigExtract {
         String[] tokens;
         String delims = "[,]+";
         String stop_id = "", trip_id = "", stop_sequence = "";
-        //Integer stop_id=0, trip_id =0, stop_sequence = 0;
 
-        BufferedReader stop_times = new BufferedReader(new FileReader(path2stopTimesFile));
+        BufferedReader stop_times = new BufferedReader(new FileReader(mPath2stopTimesFile));
         line = stop_times.readLine();
 
         try {
@@ -163,39 +169,39 @@ public class BullRunnerConfigExtract {
                 stop_sequence = tokens[4];
                 String preStopSeq = "";
                 try {
-                    preStopSeq = stopSeqIDMap.get(trip_id, stop_id);
+                    preStopSeq = mStopSeqIdMap.get(trip_id, stop_id);
                 } catch (NullPointerException e) {
 
                 }
                 if (preStopSeq == null)
-                    stopSeqIDMap.put(trip_id, stop_id, stop_sequence);
+                    mStopSeqIdMap.put(trip_id, stop_id, stop_sequence);
                 line = stop_times.readLine();
             }
 
         } finally {
             stop_times.close();
         }
-        if (stop_sequence.equals(""))
+        if (stop_sequence.equals("")) {
             throw new RuntimeException("Cannot find the stop_sequence = " + stop_sequence + ", or stop_id= " + stop_id);
+        }
 
     }
 
     /**
-     * this function extract the corresponding start_time for each trip ID from frequencies.txt in GTFS files
+     * Extract the corresponding start_time for each trip ID from frequencies.txt in GTFS files
      *
      * @throws IOException
      */
     public void extractStartTime() throws IOException {
-
         String line;
         String[] tokens;
         String delims = "[,]+";
         BufferedReader frequencies = null;
         try {
-            frequencies = new BufferedReader(new FileReader(path2frequenciesFile));
+            frequencies = new BufferedReader(new FileReader(mPath2frequenciesFile));
             line = frequencies.readLine();
         } catch (IOException e) {
-            System.out.println("error, not able to open" + e);
+            System.err.println("Error, not able to open" + e);
         }
         String start_time = "";
         String trip_id = "";
@@ -206,7 +212,7 @@ public class BullRunnerConfigExtract {
                 tokens = line.split(delims);
                 trip_id = tokens[0];
                 start_time = tokens[1];
-                startTimeByTripIDMap.put(trip_id, start_time);
+                mStartTimeByTripIDMap.put(trip_id, start_time);
                 line = frequencies.readLine();
             }
         } finally {
@@ -214,16 +220,16 @@ public class BullRunnerConfigExtract {
         }
     }
 
-    /* This function create a mapping between Syncromatics' route id and Bullrunner
-     * official route id (A, B, C, etc.)
+    /**
+     * Create a mapping between Syncromatics' route id and Bull Runner GTFS route id (A, B, C, etc.)
+     * @throws IOException
      */
-
     public void generateExternalIDMap() throws IOException {
-        BufferedReader routesBuffer = new BufferedReader(new FileReader(path2routeFile));
+        BufferedReader routesBuffer = new BufferedReader(new FileReader(mPath2routeFile));
         String line = routesBuffer.readLine();
         while ((line = routesBuffer.readLine()) != null) {
             String[] Route = line.split(",");
-            ExternalIDMap.put(Route[0], Route[7].toString());
+            mExternalIDMap.put(Route[0], Route[7].toString());
         }
     }
 }

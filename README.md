@@ -5,12 +5,12 @@ Desktop application that retrieves AVL data from the USF Bull Runner's AVL syste
 
 Protobuf URL endpoints for the feed: 
 
-* tripUpdatesUrl = `http://localhost:8088/trip-updates` (NOTE: in version 1.0.0, tripUpdates is empty)
+* tripUpdatesUrl = `http://localhost:8088/trip-updates` (Currently unsupported, feed is empty)
 * vehiclePositionsUrl = `http://localhost:8088/vehicle-positions`
 
 To see a plain text representation, add `?debug` to the end of the URL:
 
-* tripUpdatesUrl = `http://localhost:8088/trip-updates?debug`
+* tripUpdatesUrl = `http://localhost:8088/trip-updates?debug` (Currently unsupported, feed is empty)
 * vehiclePositionsUrl = `http://localhost:8088/vehicle-positions?debug`
 
 To run: 

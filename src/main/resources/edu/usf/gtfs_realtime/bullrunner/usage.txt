@@ -1,0 +1,12 @@
+Description:
+  Simple demo application that converts the USF Bull Runner Syncromatics API vehicle data into a GTFS-realtime feed
+  
+Usage:
+  java -jar demo.jar args
+
+Args:
+  --tripUpdatesPath=path           write GTFS-realtime trip updates to the specified path (currently not supported)
+  --tripUpdatesUrl=url             share GTFS-realtime trip updates at the specified URL (eg. "http://localhost:8080/trip-updates") (currently not supported)
+  --vehiclePositionsPath=path      write GTFS-realtime vehicle positions to the specified path
+  --vehiclePositionsUrl=url        share GTFS-realtime vehicle positions at the specified URL (eg. "http://localhost:8080/vehicle-positions")
+  
