@@ -82,35 +82,6 @@ public class GtfsRealtimeProviderImpl {
     private GtfsRealtimeSink mVehiclePositionsSink;
     private GtfsRealtimeSink mTripUpdatesSink;
 
-
-
-    private static float getDirVal(String direction) {
-        switch (direction) {
-            case "N":
-                return 0;
-            case "NE":
-                return 45;
-            case "E":
-                return 90;
-            case "SE":
-                return 135;
-            case "S":
-                return 180;
-            case "SW":
-                return 225;
-            case "W":
-                return 270;
-            case "NW":
-                return 315;
-            default: {
-                System.err.println("this direction is not supported: " + direction);
-                mLog.error("this direction is not supported: " + direction);
-                return 0;
-            }
-
-        }
-    }
-
     @Inject
     public void setGtfsRealtimeProvider(BullRunnerGtfsRealtimeExporter gtfsRealtimeProvider) {
         mGtfsRealtimeProvider = gtfsRealtimeProvider;
@@ -209,7 +180,10 @@ public class GtfsRealtimeProviderImpl {
             Map.Entry pair = (Map.Entry) it.next();
             String route_id = pair.getKey().toString();
             String external_id = pair.getValue().toString();
-            if (route_id.equals("MSC Express")) continue; // skip MSC Express as its vehicles are included when running route C
+            if (route_id.equals("MSC Express")) {
+                // Skip MSC Express as its vehicles are included when running route C
+                continue;
+            }
 
             // Get vehicle locations for this route_id
             JSONArray vehicleArray;
@@ -226,15 +200,17 @@ public class GtfsRealtimeProviderImpl {
                 // check if we have route_id to provide and if so, what is route id?
                 boolean has_route_id;
                 String route_id_out;
-                if (route_id.equals("C")){ // route C and MSC Express
-                    if (vehicleObj.getString("route_id").equals("Unknown")){
+                if (route_id.equals("C")) {
+                    // Route C and MSC Express
+                    if (vehicleObj.getString("route_id").equals("Unknown")) {
                         has_route_id = false;
                         route_id_out = null;
                     } else {
                         has_route_id = true;
                         route_id_out = vehicleObj.getString("route_id");
                     }
-                } else { // all other routes
+                } else {
+                    // All other routes
                     has_route_id = true;
                     route_id_out = route_id;
                 }
@@ -334,6 +310,7 @@ public class GtfsRealtimeProviderImpl {
 
     /**
      * Get vehicle locations for route C and MSC Express (which has the same route_id).
+     *
      * @param external_route_id The external_route_id from Bull Runner GTFS routes.txt
      * @return JSONArray of vehicle locations for given route
      * @throws IOException
@@ -405,7 +382,7 @@ public class GtfsRealtimeProviderImpl {
             }
 
             String pattern_name;
-            if (responsePattern.length() == 0){
+            if (responsePattern.length() == 0) {
                 mLog.error("Syncromatics API call is empty: " + urlPattern.toString());
                 pattern_name = "Unknown";
             } else {
@@ -413,7 +390,7 @@ public class GtfsRealtimeProviderImpl {
             }
 
             // Assign route_id based on pattern_name
-            if (pattern_name.equals("Unknown")){
+            if (pattern_name.equals("Unknown")) {
                 vehicleObj.put("route_id", "Unknown"); // flag to let method refreshTripVehicle know to not set route_id
                 responseOut.put(vehicleObj);
             } else if (pattern_name.equals(patternNameC)) {

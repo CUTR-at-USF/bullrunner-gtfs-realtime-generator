@@ -51,9 +51,9 @@ public class BullRunnerConfigExtract {
      */
     public void findPaths() {
         String GTFS_path;
-        if (Files.exists(Paths.get("./bullrunner-gtfs"))){
+        if (Files.exists(Paths.get("./bullrunner-gtfs"))) {
             GTFS_path = "./bullrunner-gtfs";
-        } else if (Files.exists(Paths.get("../bullrunner-gtfs"))){
+        } else if (Files.exists(Paths.get("../bullrunner-gtfs"))) {
             GTFS_path = "../bullrunner-gtfs";
         } else {
             throw new IllegalArgumentException("GTFS FILE NOT FOUND! MAKE SURE YOU HAVE EXTRACTED THE GTFS ZIP FILE IN THE MAIN DIRECTORY OR IN THE TARGET DIRECTORY");
@@ -106,6 +106,7 @@ public class BullRunnerConfigExtract {
 
     /**
      * Extract the service_id for day of week
+     *
      * @throws IOException
      */
     public void generateServiceMap() throws IOException {
@@ -222,6 +223,7 @@ public class BullRunnerConfigExtract {
 
     /**
      * Create a mapping between Syncromatics' route id and Bull Runner GTFS route id (A, B, C, etc.)
+     *
      * @throws IOException
      */
     public void generateExternalIDMap() throws IOException {
