@@ -38,10 +38,8 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.security.cert.TrustAnchor;
 import java.time.Instant;
 import java.util.Calendar;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.Executors;
@@ -336,8 +334,7 @@ public class GtfsRealtimeProviderImpl {
 
     /**
      * Get vehicle locations for route C and MSC Express (which has the same route_id).
-     * @param route_id
-     * @param external_route_id
+     * @param external_route_id The external_route_id from Bull Runner GTFS routes.txt
      * @return JSONArray of vehicle locations for given route
      * @throws IOException
      * @throws JSONException
@@ -383,6 +380,7 @@ public class GtfsRealtimeProviderImpl {
             String vehicle_id = vehicleObj.getString("id");
             URL urlPattern = new URL(mUrl + "v1/vehicles/" + vehicle_id + "/arrivals?count=100&api-key=" + mApiKey);
             try {
+                mLog.debug(urlPattern.toString());
                 connection = urlPattern.openConnection();
             } catch (Exception ex) {
                 mLog.error("Error in opening feeds url", ex);
