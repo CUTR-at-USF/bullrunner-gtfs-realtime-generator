@@ -38,8 +38,10 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.security.cert.TrustAnchor;
 import java.time.Instant;
 import java.util.Calendar;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.Executors;
@@ -219,8 +221,22 @@ public class GtfsRealtimeProviderImpl {
             }
 
             // Loop through vehicleArray to build vehiclePosition for the given route
+            HashSet addedVehicleIds = new HashSet(); // keep track of vehicles that have been added to the feed
             for (int k = 0; k < vehicleArray.length(); k++) {
                 JSONObject vehicleObj = vehicleArray.getJSONObject(k);
+                // check if vehicle has been added to feed
+                if (addedVehicleIds.contains(vehicleObj.getString(FIELD_NAME))) {
+                    continue;
+                } else {
+                    addedVehicleIds.add(vehicleObj.getString(FIELD_NAME));
+                }
+                // check if we need to skip setting route_id if the API returns empty response for route C and MSC
+                boolean has_route_id;
+                if ((route_id.equals("C") || route_id.equals("MSC Express")) &&
+                        vehicleObj.getString("route_id").equals("Unknown")){
+                    has_route_id = false;
+                } else {has_route_id = true;}
+
                 // initiate feed
                 TripDescriptor.Builder tripDescriptor = TripDescriptor.newBuilder();
                 Position.Builder position = Position.newBuilder();
@@ -228,8 +244,8 @@ public class GtfsRealtimeProviderImpl {
                 FeedEntity.Builder vehiclePositionEntity = FeedEntity.newBuilder();
 
                 // set values for feed
-                tripDescriptor.setRouteId(route_id);
-                tripDescriptor.setTripId(findTripID(route_id));
+                if (has_route_id) tripDescriptor.setRouteId(route_id);
+                if (has_route_id) tripDescriptor.setTripId(findTripID(route_id));
                 position.setBearing((float) Math.round(100 * vehicleObj.getDouble(FIELD_HEADING_DEGREES)) / 100);
                 position.setLatitude((float) vehicleObj.getDouble(FIELD_LAT));
                 position.setLongitude((float) vehicleObj.getDouble(FIELD_LON));
@@ -246,6 +262,7 @@ public class GtfsRealtimeProviderImpl {
                 vpBuilder.setTimestamp(
                         Instant.parse(vehicleObj.getString(FIELD_LAST_UPDATED)).getEpochSecond()
                 );
+                vpBuilder.hasVehicle();
                 if (vehicleObj.getDouble(FIELD_PASSENGER_LOAD) <= 0) {
                     vpBuilder.setOccupancyStatus(OccupancyStatus.EMPTY);
                 } else if (vehicleObj.getDouble(FIELD_PASSENGER_LOAD) <= 50) {
@@ -357,9 +374,6 @@ public class GtfsRealtimeProviderImpl {
             response = null;
         }
 
-        if (response.length() == 0)
-            return null;
-
         // Keep only vehicles of the given route_id
         JSONArray responseOut = new JSONArray();
         for (int i = 0; i < response.length(); i++) {
@@ -368,7 +382,6 @@ public class GtfsRealtimeProviderImpl {
             // check pattern name
             URL urlPattern = new URL(mUrl + "v1/vehicles/" + vehicle_id + "/arrivals?count=100&api-key=" + mApiKey);
             try {
-                mLog.info(urlPattern.toString());
                 connection = urlPattern.openConnection();
             } catch (Exception ex) {
                 mLog.error("Error in opening feeds url", ex);
@@ -389,18 +402,30 @@ public class GtfsRealtimeProviderImpl {
                 responsePattern = new JSONArray(builder1.toString());
             } catch (SocketTimeoutException ex) {
                 mLog.error("Error readline, server doesn't close the connection.", ex);
-                responsePattern = null;
-                return null;
+                continue;
             }
-            String pattern_name = responsePattern.getJSONObject(0).getJSONObject("pattern").getString("name");
+
+            String pattern_name;
+            if (responsePattern.length() == 0){
+                mLog.error("Syncromatics API call is empty: " + urlPattern.toString());
+                pattern_name = "Unknown";
+            } else {
+                pattern_name = responsePattern.getJSONObject(0).getJSONObject("pattern").getString("name");
+                if (!pattern_name.equals(patternNameC) && !pattern_name.equals(patternNameMSC)){
+                    mLog.warn("NEW PATTERN NAME DETECTED FOR ROUTE C IN THE API: " + pattern_name);
+                }
+            }
 
             // check if pattern name matches
-            if (pattern_name.equals(patternNameC) && route_id.equals(routeIdC)) {
+            if (pattern_name.equals("Unknown")){
+                vehicleObj.put("route_id", "Unknown"); // flag to let method refreshTripVehicle know to not set route_id
                 responseOut.put(vehicleObj);
+            } else if (pattern_name.equals(patternNameC) && route_id.equals(routeIdC)) {
+                responseOut.put(vehicleObj);
+                vehicleObj.put("route_id", route_id);
             } else if (pattern_name.equals(patternNameMSC) && route_id.equals(routeIdMSC)) {
                 responseOut.put(vehicleObj);
-            } else {
-                throw new RuntimeException("NEW PATTERN NAME DETECTED FOR ROUTE C IN THE API: " + pattern_name);
+                vehicleObj.put("route_id", route_id);
             }
         }
 
