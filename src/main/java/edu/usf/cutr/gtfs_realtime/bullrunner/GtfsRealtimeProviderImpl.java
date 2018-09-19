@@ -211,31 +211,35 @@ public class GtfsRealtimeProviderImpl {
             Map.Entry pair = (Map.Entry) it.next();
             String route_id = pair.getKey().toString();
             String external_id = pair.getValue().toString();
+            if (route_id.equals("MSC Express")) continue; // skip MSC Express as its vehicles are included when running route C
 
             // Get vehicle locations for this route_id
             JSONArray vehicleArray;
-            if (route_id.equals("C") || route_id.equals("MSC Express")) {
-                vehicleArray = downloadVehiclesRouteC(route_id, external_id);
+            if (route_id.equals("C")) {
+                vehicleArray = downloadVehiclesRouteC(external_id);
             } else {
                 vehicleArray = downloadVehicles(external_id);
             }
 
             // Loop through vehicleArray to build vehiclePosition for the given route
-            HashSet addedVehicleIds = new HashSet(); // keep track of vehicles that have been added to the feed
             for (int k = 0; k < vehicleArray.length(); k++) {
                 JSONObject vehicleObj = vehicleArray.getJSONObject(k);
-                // check if vehicle has been added to feed
-                if (addedVehicleIds.contains(vehicleObj.getString(FIELD_NAME))) {
-                    continue;
-                } else {
-                    addedVehicleIds.add(vehicleObj.getString(FIELD_NAME));
-                }
-                // check if we need to skip setting route_id if the API returns empty response for route C and MSC
+
+                // check if we have route_id to provide and if so, what is route id?
                 boolean has_route_id;
-                if ((route_id.equals("C") || route_id.equals("MSC Express")) &&
-                        vehicleObj.getString("route_id").equals("Unknown")){
-                    has_route_id = false;
-                } else {has_route_id = true;}
+                String route_id_out;
+                if (route_id.equals("C")){ // route C and MSC Express
+                    if (vehicleObj.getString("route_id").equals("Unknown")){
+                        has_route_id = false;
+                        route_id_out = null;
+                    } else {
+                        has_route_id = true;
+                        route_id_out = vehicleObj.getString("route_id");
+                    }
+                } else { // all other routes
+                    has_route_id = true;
+                    route_id_out = route_id;
+                }
 
                 // initiate feed
                 TripDescriptor.Builder tripDescriptor = TripDescriptor.newBuilder();
@@ -244,7 +248,7 @@ public class GtfsRealtimeProviderImpl {
                 FeedEntity.Builder vehiclePositionEntity = FeedEntity.newBuilder();
 
                 // set values for feed
-                if (has_route_id) tripDescriptor.setRouteId(route_id);
+                if (has_route_id) tripDescriptor.setRouteId(route_id_out);
                 if (has_route_id) tripDescriptor.setTripId(findTripID(route_id));
                 position.setBearing((float) Math.round(100 * vehicleObj.getDouble(FIELD_HEADING_DEGREES)) / 100);
                 position.setLatitude((float) vehicleObj.getDouble(FIELD_LAT));
@@ -262,16 +266,15 @@ public class GtfsRealtimeProviderImpl {
                 vpBuilder.setTimestamp(
                         Instant.parse(vehicleObj.getString(FIELD_LAST_UPDATED)).getEpochSecond()
                 );
-                vpBuilder.hasVehicle();
                 if (vehicleObj.getDouble(FIELD_PASSENGER_LOAD) <= 0) {
                     vpBuilder.setOccupancyStatus(OccupancyStatus.EMPTY);
-                } else if (vehicleObj.getDouble(FIELD_PASSENGER_LOAD) <= 50) {
+                } else if (vehicleObj.getDouble(FIELD_PASSENGER_LOAD) <= 0.50) {
                     vpBuilder.setOccupancyStatus(OccupancyStatus.MANY_SEATS_AVAILABLE);
-                } else if (vehicleObj.getDouble(FIELD_PASSENGER_LOAD) <= 70) {
+                } else if (vehicleObj.getDouble(FIELD_PASSENGER_LOAD) <= 0.70) {
                     vpBuilder.setOccupancyStatus(OccupancyStatus.FEW_SEATS_AVAILABLE);
-                } else if (vehicleObj.getDouble(FIELD_PASSENGER_LOAD) <= 90) {
+                } else if (vehicleObj.getDouble(FIELD_PASSENGER_LOAD) <= 0.90) {
                     vpBuilder.setOccupancyStatus(OccupancyStatus.STANDING_ROOM_ONLY);
-                } else if (vehicleObj.getDouble(FIELD_PASSENGER_LOAD) <= 95) {
+                } else if (vehicleObj.getDouble(FIELD_PASSENGER_LOAD) <= 0.95) {
                     vpBuilder.setOccupancyStatus(OccupancyStatus.CRUSHED_STANDING_ROOM_ONLY);
                 } else {
                     vpBuilder.setOccupancyStatus(OccupancyStatus.FULL);
@@ -332,21 +335,20 @@ public class GtfsRealtimeProviderImpl {
     }
 
     /**
-     * Get vehicle locations for MSC Express (which has the same route_id as C).  Provided route id must be "C" or
-     * "MSC Express".
-     *
+     * Get vehicle locations for route C and MSC Express (which has the same route_id).
      * @param route_id
      * @param external_route_id
      * @return JSONArray of vehicle locations for given route
      * @throws IOException
      * @throws JSONException
      */
-    private JSONArray downloadVehiclesRouteC(String route_id, String external_route_id) throws IOException, JSONException {
+    private JSONArray downloadVehiclesRouteC(String external_route_id) throws IOException, JSONException {
         final String patternNameC = "Route C";
         final String patternNameMSC = "MSC Express";
         final String routeIdC = "C";
         final String routeIdMSC = "MSC Express";
 
+        // get vehicles
         URLConnection connection = null;
         URL url = new URL(mUrl + "routes/" + external_route_id + "/vehicles?api-key=" + mApiKey);
         try {
@@ -374,12 +376,11 @@ public class GtfsRealtimeProviderImpl {
             response = null;
         }
 
-        // Keep only vehicles of the given route_id
+        // Find pattern_name for each vehicle
         JSONArray responseOut = new JSONArray();
         for (int i = 0; i < response.length(); i++) {
             JSONObject vehicleObj = response.getJSONObject(i);
             String vehicle_id = vehicleObj.getString("id");
-            // check pattern name
             URL urlPattern = new URL(mUrl + "v1/vehicles/" + vehicle_id + "/arrivals?count=100&api-key=" + mApiKey);
             try {
                 connection = urlPattern.openConnection();
@@ -411,21 +412,20 @@ public class GtfsRealtimeProviderImpl {
                 pattern_name = "Unknown";
             } else {
                 pattern_name = responsePattern.getJSONObject(0).getJSONObject("pattern").getString("name");
-                if (!pattern_name.equals(patternNameC) && !pattern_name.equals(patternNameMSC)){
-                    mLog.warn("NEW PATTERN NAME DETECTED FOR ROUTE C IN THE API: " + pattern_name);
-                }
             }
 
-            // check if pattern name matches
+            // Assign route_id based on pattern_name
             if (pattern_name.equals("Unknown")){
                 vehicleObj.put("route_id", "Unknown"); // flag to let method refreshTripVehicle know to not set route_id
                 responseOut.put(vehicleObj);
-            } else if (pattern_name.equals(patternNameC) && route_id.equals(routeIdC)) {
+            } else if (pattern_name.equals(patternNameC)) {
+                vehicleObj.put("route_id", routeIdC);
                 responseOut.put(vehicleObj);
-                vehicleObj.put("route_id", route_id);
-            } else if (pattern_name.equals(patternNameMSC) && route_id.equals(routeIdMSC)) {
+            } else if (pattern_name.equals(patternNameMSC)) {
+                vehicleObj.put("route_id", routeIdMSC);
                 responseOut.put(vehicleObj);
-                vehicleObj.put("route_id", route_id);
+            } else {
+                mLog.warn("NEW PATTERN NAME DETECTED FOR ROUTE C IN THE API: " + pattern_name);
             }
         }
 
