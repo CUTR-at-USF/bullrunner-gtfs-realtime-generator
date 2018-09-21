@@ -14,8 +14,8 @@ To see a plain text representation, add `?debug` to the end of the URL:
 * vehiclePositionsUrl = `http://localhost:8088/vehicle-positions?debug`
 
 To run: 
-1. Create key.txt file in the main directory and save the API key in the file (API key can be requested from [Syncromatics](http://gmvsyncromatics.com/contact/))
-2. Extract the bullrunner-gtfs.zip file in the same folder. The extracted folder should be name "bullrunner-gtfs"
+1. Create a `key.txt` file in the main directory and save the API key in the file (API key can be requested from [Syncromatics](http://gmvsyncromatics.com/contact/))
+2. Extract the `bullrunner-gtfs.zip` file in the same folder. The extracted folder should be name `bullrunner-gtfs`.
 3. Build `mvn package`
 4. Run `java -jar target/bullrunner-gtfs-realtime-generator-1.0.0-SNAPSHOT.jar --vehiclePositionsUrl=http://localhost:8088/vehicle-positions`
 
